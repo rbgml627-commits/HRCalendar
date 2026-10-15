@@ -141,7 +141,7 @@ details.rec > summary::-webkit-details-marker { display: none; }
 @media (max-width: 560px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .fld label { font-size: 12.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
-.fld input[type="text"], .fld input[type="date"], .fld select, .fld textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 8px 10px; min-width: 0; width: 100%; }
+.fld input[type="text"], .fld select, .fld textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 8px 10px; min-width: 0; width: 100%; }
 .fld.wide { grid-column: 1 / -1; }
 .fld .hint { font-size: 12px; color: var(--muted); }
 .preview { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -183,6 +183,10 @@ details.rec > summary::-webkit-details-marker { display: none; }
 .legend .ev { display: inline-block; width: auto; height: auto; border-radius: 3px; padding: 1px 6px; }
 .legend .ev .t { display: inline; }
 [hidden] { display: none !important; }
+.grpwrap { margin-bottom: 18px; }
+.grp { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 4px 2px 8px; }
+.grp-h b { font-size: 1.05rem; }
+.fld input.bad { border-color: var(--over); }
 .overlay { position: fixed; inset: 0; background: rgba(10, 18, 28, 0.55); display: flex; align-items: center; justify-content: center; z-index: 20; padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .dlg { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; max-width: 580px; width: 100%; max-height: 100%; overflow: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .dlg h2.t { margin: 0; font-size: 18px; }
@@ -257,10 +261,10 @@ details.rec > summary::-webkit-details-marker { display: none; }
           <option value="spouse">배우자 출산휴가</option>
         </select>
       </div>
-      <div class="fld"><label for="f-apply">결재(신청)일</label><input type="date" id="f-apply"></div>
-      <div class="fld"><label for="f-start">시작일</label><input type="date" id="f-start"></div>
-      <div class="fld"><label for="f-end">종료일</label><input type="date" id="f-end"></div>
-      <div class="fld" id="w-birth"><label for="f-birth">자녀 출산일</label><input type="date" id="f-birth"><span class="hint">사용 기한(출산일 + 120일) 계산에 씁니다.</span></div>
+      <div class="fld"><label for="f-apply">결재(신청)일</label><input type="text" id="f-apply" class="dt" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="예: 20261015"></div>
+      <div class="fld"><label for="f-start">시작일</label><input type="text" id="f-start" class="dt" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="예: 20261015"></div>
+      <div class="fld"><label for="f-end">종료일</label><input type="text" id="f-end" class="dt" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="예: 20261015"></div>
+      <div class="fld" id="w-birth"><label for="f-birth">자녀 출산일</label><input type="text" id="f-birth" class="dt" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="예: 20261015"><span class="hint">사용 기한(출산일 + 120일) 계산에 씁니다.</span></div>
       <div class="fld" id="w-ins"><label for="f-ins">고용보험료 지원 사업장</label>
         <select id="f-ins"><option value="0">아니오</option><option value="1">예 (휴직 등 신고서 필요)</option></select>
       </div>
@@ -434,6 +438,13 @@ function taskStatus(t, done, today) {
       { id: "demo4", name: "최하늘", dept: "총무팀", type: "parental", apply: a(today, -500), start: a(today, -470), end: a(today, -100), done: { notice: a(today, -490), report: a(today, -465), confirm: a(today, -440), sub1: a(today, -370), sub2: a(today, -280), sub3: a(today, -190), sub4: a(today, -100) }, demo: true }
     ];
   }
+  let NTH = {};
+  function computeOrd() {
+    NTH = {}; const g = {};
+    recs().filter(validRec).forEach(r => { const k = r.name + "|" + r.type; (g[k] = g[k] || []).push(r); });
+    Object.keys(g).forEach(k => { if (g[k].length > 1) g[k].sort((a, b) => (a.start < b.start ? -1 : 1)).forEach((r, i) => { NTH[r.id] = i + 1; }); });
+  }
+  const nm = r => r.name + (NTH[r.id] ? "[" + NTH[r.id] + "회]" : "");
   const isDemo = () => state.records.length === 0;
   const recs = () => (isDemo() ? state.demo : state.records);
 
@@ -473,7 +484,7 @@ function taskStatus(t, done, today) {
       const today = todayStr();
       st = { k: "info", big: t.due ? (D.diff(t.due, today) >= 0 ? "~" + dot(t.due).slice(2) : "종료") : "안내", label: "" };
     } else st = taskStatus(t, done, todayStr());
-    const who = rec.name + " · " + TYPE[rec.type];
+    const who = nm(rec) + " · " + TYPE[rec.type];
     const dates = t.from && t.due ? '<span>' + (info ? "" : "신청 ") + dot(t.from).slice(2) + " ~</span><b>" + dot(t.due).slice(2) + "</b>"
       : t.due ? '<span>' + (t.soft ? "권장 마감" : "마감") + '</span><b>' + dot(t.due).slice(2) + "</b>" : "";
     const chk = !info && opts.check ? '<label class="chk"><input type="checkbox" data-act="done" data-rec="' + esc(rec.id) + '" data-key="' + esc(t.key) + '"' + (done ? " checked" : "") + '> 완료</label>' : "";
@@ -528,11 +539,8 @@ function taskStatus(t, done, today) {
       groups[b[0]].map(x => rowHtml(x.t, x.r, { check: true })).join("") + "</ul>").join("");
   }
 
-  function renderEmp() {
-    const today = todayStr();
-    const list = recs().filter(validRec).slice().sort((a, b) => (a.start < b.start ? 1 : -1));
-    if (!list.length) return '<div class="empty">등록된 결재가 없습니다.</div>';
-    return list.map(r => {
+  function empCard(r) {
+      const today = todayStr();
       const T = buildTasks(r, state.cfg);
       const tasks = T.filter(t => t.kind === "task");
       const doneN = tasks.filter(t => r.done && r.done[t.key]).length;
@@ -550,6 +558,30 @@ function taskStatus(t, done, today) {
         '<ul class="rows">' + T.map(t => rowHtml(t, r, { check: true, noWho: true })).join("") + "</ul>" + demoNote +
         (r.demo ? "" : '<div class="tools"><button class="btn small" type="button" data-act="edit" data-rec="' + esc(r.id) + '">수정</button><button class="btn small danger" type="button" data-act="del" data-rec="' + esc(r.id) + '">삭제</button></div>') +
         "</div></details>";
+  }
+
+  function renderEmp() {
+    const list = recs().filter(validRec);
+    if (!list.length) return '<div class="empty">등록된 결재가 없습니다.</div>';
+    const groups = {};
+    list.forEach(r => { const k = r.name + "|" + (r.dept || ""); (groups[k] = groups[k] || []).push(r); });
+    const gl = Object.keys(groups).map(k => groups[k].slice().sort((a, b) => (a.start < b.start ? 1 : -1)));
+    gl.sort((a, b) => (a[0].start < b[0].start ? 1 : -1));
+    return gl.map(g => {
+      const h = g[0];
+      const days = r => D.diff(r.end, r.start) + 1;
+      const sums = Object.keys(TYPE).map(t => {
+        const x = g.filter(r => r.type === t); if (!x.length) return "";
+        const tot = x.reduce((n, r) => n + days(r), 0);
+        return TYPE[t] + " " + x.length + "회 · 총 " + tot + "일 (약 " + (Math.round(tot / 30.4 * 10) / 10) + "개월)";
+      }).filter(Boolean);
+      const asc = g.slice().sort((a, b) => (a.start < b.start ? -1 : 1)); const ov = [];
+      for (let i = 1; i < asc.length; i++) for (let j = 0; j < i; j++) if (asc[i].start <= asc[j].end) { ov.push(dot(asc[j].start) + "~" + dot(asc[j].end) + " 와 " + dot(asc[i].start) + "~" + dot(asc[i].end)); break; }
+      const head = g.length > 1 || !h.demo ? '<div class="grp"><div class="grp-h"><b>' + esc(h.name) + "</b>" + (h.dept ? ' <span class="meta">' + esc(h.dept) + "</span>" : "") +
+        '<div class="meta">' + esc(sums.join("  /  ")) + "</div>" +
+        (ov.length ? '<div class="warn">기간이 겹치는 결재가 있습니다: ' + esc(ov.join(", ")) + "</div>" : "") + "</div>" +
+        (h.demo ? "" : '<button class="btn small" type="button" data-act="again" data-rec="' + esc(asc[asc.length - 1].id) + '">+ 이어서 등록</button>') + "</div>" : "";
+      return '<section class="grpwrap">' + head + g.map(empCard).join("") + "</section>";
     }).join("");
   }
 
@@ -565,6 +597,7 @@ function taskStatus(t, done, today) {
     $("#banner").innerHTML = isDemo()
       ? '<div class="banner"><b>예시 데이터입니다.</b> 아래 직원과 일정은 오늘 날짜를 기준으로 만든 예시이며 저장되지 않습니다. 첫 결재를 등록하면 사라집니다.</div>'
       : (state.mode === "local" ? '<div class="banner">이 브라우저에만 저장됩니다. 브라우저 기록을 지우면 사라지니 가끔 [백업 저장]을 눌러 파일로 보관하세요.</div>' : "");
+    computeOrd();
     const items = allTasks();
     renderSummary(items);
     $("#tab-todo").setAttribute("aria-selected", state.tab === "todo");
@@ -591,24 +624,24 @@ function taskStatus(t, done, today) {
     recs().forEach(r => {
       if (!validRec(r)) return;
       const dn = k => !!(r.done && r.done[k]);
-      ev.push({ d: r.start, text: r.name + " " + TSHORT[r.type] + " 시작", k: "leave", r: r });
-      ev.push({ d: D.addDays(r.end, 1), text: r.name + " " + TSHORT[r.type] + " 복직", k: "leave", r: r });
+      ev.push({ d: r.start, text: nm(r) + " " + TSHORT[r.type] + " 시작", k: "leave", r: r });
+      ev.push({ d: D.addDays(r.end, 1), text: nm(r) + " " + TSHORT[r.type] + " 복직", k: "leave", r: r });
       const T = buildTasks(r, state.cfg);
       const subs = T.filter(t => /^sub\d+$/.test(t.key));
       T.forEach(t => {
         if (t.kind !== "task") return;
         if (/^sub\d+$/.test(t.key)) {
-          ev.push({ d: t.from, text: r.name + " " + t.key.slice(3) + "차 신청 가능", k: dn(t.key) ? "done" : "start", t: t, r: r });
+          ev.push({ d: t.from, text: nm(r) + " " + t.key.slice(3) + "차 신청 가능", k: dn(t.key) ? "done" : "start", t: t, r: r });
         } else if (t.key === "subPost") {
-          ev.push({ d: t.from, text: r.name + " 잔여 50% 신청 가능", k: dn(t.key) ? "done" : "start", t: t, r: r });
-          ev.push({ d: t.due, text: r.name + " 잔여 50% 신청 마감", k: deadlineKind(t.due, dn(t.key), today), t: t, r: r });
+          ev.push({ d: t.from, text: nm(r) + " 잔여 50% 신청 가능", k: dn(t.key) ? "done" : "start", t: t, r: r });
+          ev.push({ d: t.due, text: nm(r) + " 잔여 50% 신청 마감", k: deadlineKind(t.due, dn(t.key), today), t: t, r: r });
         } else {
-          ev.push({ d: t.due, text: r.name + " " + SHORT[t.key] + " 마감", k: deadlineKind(t.due, dn(t.key), today), t: t, r: r });
+          ev.push({ d: t.due, text: nm(r) + " " + SHORT[t.key] + " 마감", k: deadlineKind(t.due, dn(t.key), today), t: t, r: r });
         }
       });
       if (subs.length) {
         const undone = subs.filter(t => !dn(t.key));
-        ev.push({ d: subs[0].due, text: r.name + " 지원금 1~" + subs.length + "차 신청 최종 마감", k: deadlineKind(subs[0].due, undone.length === 0, today), t: undone[0] || subs[0], r: r });
+        ev.push({ d: subs[0].due, text: nm(r) + " 지원금 1~" + subs.length + "차 신청 최종 마감", k: deadlineKind(subs[0].due, undone.length === 0, today), t: undone[0] || subs[0], r: r });
       }
     });
     return ev;
@@ -685,11 +718,41 @@ function taskStatus(t, done, today) {
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#alert").hidden) closeAlert(false); });
 
   /* ---------- form ---------- */
+  /* ---------- date inputs: 20261015 -> 2026.10.15 ---------- */
+  function fmtDigits(d) { return d.slice(0, 4) + (d.length > 4 ? "." + d.slice(4, 6) : "") + (d.length > 6 ? "." + d.slice(6, 8) : ""); }
+  function getDate(id) {
+    const d = $("#" + id).value.replace(/\D/g, "");
+    if (d.length !== 8) return "";
+    const y = +d.slice(0, 4), m = +d.slice(4, 6), dd = +d.slice(6, 8);
+    const dt = new Date(Date.UTC(y, m - 1, dd));
+    if (y < 1990 || m < 1 || m > 12 || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== dd) return "";
+    return d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6, 8);
+  }
+  function setDate(id, iso) { $("#" + id).value = iso ? fmtDigits(iso.replace(/\D/g, "")) : ""; markDate($("#" + id)); }
+  function markDate(el) {
+    const d = el.value.replace(/\D/g, "");
+    el.classList.toggle("bad", d.length === 8 && !getDate(el.id));
+  }
+  const DATE_IDS = ["f-apply", "f-start", "f-end", "f-birth"];
+  DATE_IDS.forEach(id => {
+    const el = $("#" + id);
+    el.addEventListener("input", e => {
+      const before = el.value.replace(/\D/g, "");
+      const d = before.slice(0, 8);
+      el.value = fmtDigits(d); markDate(el);
+      if (d.length === 8 && getDate(id) && e.inputType && e.inputType.indexOf("insert") === 0) {
+        const nxt = DATE_IDS.slice(DATE_IDS.indexOf(id) + 1).map(x => $("#" + x)).find(x => x && !x.closest("[hidden]"));
+        if (nxt) nxt.focus();
+      }
+    });
+    el.addEventListener("focus", () => el.select());
+  });
+
   function readForm() {
     return { id: state.editing ? state.editing.id : "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       name: $("#f-name").value.trim(), dept: $("#f-dept").value.trim(), type: $("#f-type").value,
-      apply: $("#f-apply").value, start: $("#f-start").value, end: $("#f-end").value,
-      birth: $("#f-birth").value, insSupport: $("#f-ins").value === "1", memo: $("#f-memo").value.trim(),
+      apply: getDate("f-apply"), start: getDate("f-start"), end: getDate("f-end"),
+      birth: getDate("f-birth"), insSupport: $("#f-ins").value === "1", memo: $("#f-memo").value.trim(),
       done: state.editing ? Object.assign({}, state.editing.done) : {} };
   }
   function syncTypeFields() {
@@ -704,13 +767,13 @@ function taskStatus(t, done, today) {
     $("#f-warn").innerHTML = warnings(r).map(w => '<div class="warn">' + esc(w) + "</div>").join("");
     $("#f-preview").innerHTML = buildTasks(r, state.cfg).map(t => rowHtml(t, r, { check: false, noWho: true })).join("");
   }
-  function openForm(rec) {
-    state.editing = rec || null;
-    $("#form-title").textContent = rec ? "결재 수정" : "결재 등록";
+  function openForm(rec, asNew) {
+    state.editing = rec && !asNew ? rec : null;
+    $("#form-title").textContent = rec && !asNew ? "결재 수정" : "결재 등록";
     const v = rec || { name: "", dept: "", type: "parental", apply: todayStr(), start: "", end: "", birth: "", insSupport: false, memo: "" };
     $("#f-name").value = v.name; $("#f-dept").value = v.dept || ""; $("#f-type").value = v.type;
-    $("#f-apply").value = v.apply; $("#f-start").value = v.start; $("#f-end").value = v.end;
-    $("#f-birth").value = v.birth || ""; $("#f-ins").value = v.insSupport ? "1" : "0"; $("#f-memo").value = v.memo || "";
+    setDate("f-apply", v.apply); setDate("f-start", v.start); setDate("f-end", v.end);
+    setDate("f-birth", v.birth); $("#f-ins").value = v.insSupport ? "1" : "0"; $("#f-memo").value = v.memo || "";
     $("#form").hidden = false; updatePreview();
     $("#form").scrollIntoView({ block: "start" }); $("#f-name").focus({ preventScroll: true });
   }
@@ -727,6 +790,10 @@ function taskStatus(t, done, today) {
     const b = e.target.closest("[data-act]"); if (!b) return;
     const act = b.dataset.act;
     if (act === "filter") { state.filter = b.dataset.v; render(); }
+    else if (act === "again") {
+      const base = state.records.find(x => x.id === b.dataset.rec); if (!base) return;
+      openForm({ name: base.name, dept: base.dept, type: base.type, apply: todayStr(), start: D.addDays(base.end, 1), end: "", insSupport: base.insSupport, memo: "" }, true);
+    }
     else if (act === "showdone") { state.showDone = !state.showDone; render(); }
     else if (act === "calprev") { state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; } render(); }
     else if (act === "calnext") { state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; } render(); }
