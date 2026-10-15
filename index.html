@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>휴직 신고 관리대장</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 공문서 대장처럼 마감일이 왼쪽 끝에 서는 단일 열. 위에는 요약, 아래는 마감 순 목록과 직원별 보기. */
+:root {
+  --bg: #edf0f4;
+  --surface: #ffffff;
+  --surface-2: #f5f7fa;
+  --ink: #15202d;
+  --muted: #586678;
+  --line: #d3dae3;
+  --accent: #1d4f91;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2ebf7;
+  --over: #b3261e;
+  --over-soft: #fbe6e4;
+  --soon: #94560a;
+  --soon-soft: #fbefd9;
+  --ok: #1c7447;
+  --ok-soft: #e0f1e8;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1620; --surface: #16212d; --surface-2: #1b2837; --ink: #e5eaf1; --muted: #9aa8b9;
+    --line: #2a3a4c; --accent: #6ea4ee; --accent-ink: #0b1522; --accent-soft: #1d3150;
+    --over: #ff8b82; --over-soft: #3a1e1e; --soon: #f0b660; --soon-soft: #3a2c12; --ok: #6fd0a0; --ok-soft: #14301f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1620; --surface: #16212d; --surface-2: #1b2837; --ink: #e5eaf1; --muted: #9aa8b9;
+  --line: #2a3a4c; --accent: #6ea4ee; --accent-ink: #0b1522; --accent-soft: #1d3150;
+  --over: #ff8b82; --over-soft: #3a1e1e; --soon: #f0b660; --soon-soft: #3a2c12; --ok: #6fd0a0; --ok-soft: #14301f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+header.top { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; justify-content: space-between; }
+header.top h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+header.top .sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 8px 14px; border-radius: 6px; font-weight: 500; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.btn.danger { color: var(--over); }
+.btn.danger.armed { background: var(--over); color: var(--surface); border-color: var(--over); }
+
+.banner { background: var(--accent-soft); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; font-size: 13px; }
+.banner b { font-weight: 600; }
+
+.summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.summary > div { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; border-left: 1px solid var(--line); min-width: 0; }
+.summary > div:first-child { border-left: 0; }
+.summary b { font-family: var(--font-mono); font-size: 26px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.summary span { font-size: 12px; color: var(--muted); }
+.summary .c-over b { color: var(--over); }
+.summary .c-soon b { color: var(--soon); }
+@media (max-width: 560px) {
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary > div:nth-child(3) { border-left: 0; }
+  .summary > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
+
+.bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 3px; }
+.tabs button { border: 0; background: transparent; padding: 6px 14px; border-radius: 6px; font-weight: 500; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+h2.bucket { margin: 12px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+h2.bucket::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+h2.bucket.over { color: var(--over); }
+ul.rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.row { display: grid; grid-template-columns: 5.2rem minmax(0, 1fr) auto; gap: 4px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; align-items: start; }
+.row.over { border-color: var(--over); }
+.row.done { opacity: 0.6; }
+.dday { display: flex; flex-direction: column; gap: 0; }
+.dday b { font-family: var(--font-mono); font-size: 22px; font-weight: 600; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.dday small { font-size: 11px; color: var(--muted); }
+.row.over .dday b { color: var(--over); }
+.row.soon .dday b { color: var(--soon); }
+.row.wait .dday b { color: var(--muted); }
+.row.done .dday b { color: var(--ok); }
+.row .main { min-width: 0; }
+.ttl { font-weight: 600; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.tag { font-size: 11px; font-weight: 500; border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; color: var(--muted); }
+.tag.g-지원금 { color: var(--accent); border-color: var(--accent); }
+.meta { font-size: 13px; color: var(--muted); }
+.note { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; font-size: 12.5px; color: var(--muted); }
+.side b { font-family: var(--font-mono); font-size: 13px; color: var(--ink); font-weight: 500; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink); cursor: pointer; }
+.chk input { width: 17px; height: 17px; accent-color: var(--accent); }
+@media (max-width: 560px) {
+  .row { grid-template-columns: 4.4rem minmax(0, 1fr); }
+  .side { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; text-align: left; border-top: 1px solid var(--line); padding-top: 8px; margin-top: 4px; }
+}
+.row.info { background: var(--surface-2); }
+.row.info .dday b { font-size: 16px; color: var(--muted); }
+
+.empty { text-align: center; color: var(--muted); padding: 28px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--surface); }
+
+details.rec { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+details.rec > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+details.rec > summary::-webkit-details-marker { display: none; }
+.rec .who { font-weight: 600; font-size: 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.pill { font-size: 12px; font-weight: 500; background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 1px 8px; }
+.rec .period { font-size: 13px; color: var(--muted); }
+.rec .next { grid-column: 1 / -1; font-size: 13px; }
+.rec .next b { font-family: var(--font-mono); font-weight: 600; }
+.rec .prog { font-family: var(--font-mono); font-size: 13px; color: var(--muted); text-align: right; }
+.rec .body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.rec .tools { display: flex; gap: 8px; justify-content: flex-end; }
+.warn { background: var(--soon-soft); color: var(--soon); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.panel h2 { margin: 0; font-size: 17px; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 560px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fld label { font-size: 12.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
+.fld input[type="text"], .fld input[type="date"], .fld select, .fld textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 8px 10px; min-width: 0; width: 100%; }
+.fld.wide { grid-column: 1 / -1; }
+.fld .hint { font-size: 12px; color: var(--muted); }
+.preview { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.preview h3 { margin: 0; font-size: 13px; letter-spacing: 0.04em; color: var(--muted); }
+.preview .row { background: var(--surface); }
+.formbtns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.rules { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.rules ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.rules h3 { margin: 6px 0 0; font-size: 13px; color: var(--ink); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 6px; font-size: 13px; z-index: 10; max-width: calc(100% - 32px); }
+.badge { display: inline-block; min-width: 1.4em; padding: 0 6px; border-radius: 999px; background: var(--over); color: var(--surface); font-size: 12px; text-align: center; margin-left: 4px; }
+.calhead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.calhead .mo { font-size: 18px; font-weight: 700; }
+.calnav { display: flex; gap: 6px; align-items: center; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.cal .wd { padding: 6px 4px; font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; background: var(--surface-2); }
+.cal .wd.sun { color: var(--over); }
+.cd { min-height: 96px; border: 0; background: var(--surface); padding: 4px; text-align: left; display: flex; flex-direction: column; gap: 2px; min-width: 0; align-items: stretch; }
+.cd.out { background: var(--surface-2); color: var(--muted); }
+.cd .dn { font-size: 12px; align-self: flex-start; }
+.cd.today .dn { background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 0 7px; }
+.cd.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cdev { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ev { display: block; font-size: 11.5px; line-height: 1.35; padding: 1px 5px; border-radius: 3px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 100%; }
+.ev.over { background: var(--over); color: var(--surface); font-weight: 600; }
+.ev.soon { background: var(--soon-soft); color: var(--soon); font-weight: 600; }
+.ev.due { background: var(--accent-soft); color: var(--accent); }
+.ev.start { border: 1px solid var(--accent); color: var(--accent); }
+.ev.done { background: var(--ok-soft); color: var(--ok); text-decoration: line-through; }
+.ev.leave { background: var(--surface-2); color: var(--muted); border: 1px dashed var(--line); }
+.more { font-size: 11px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; color: var(--muted); margin: 8px 0 4px; align-items: center; }
+@media (max-width: 560px) {
+  .cd { min-height: 60px; }
+  .cdev { flex-direction: row; flex-wrap: wrap; gap: 3px; }
+  .ev { width: 9px; height: 9px; padding: 0; border-radius: 50%; }
+  .ev .t { display: none; }
+}
+.legend .ev { display: inline-block; width: auto; height: auto; border-radius: 3px; padding: 1px 6px; }
+.legend .ev .t { display: inline; }
+.overlay { position: fixed; inset: 0; background: rgba(10, 18, 28, 0.55); display: flex; align-items: center; justify-content: center; z-index: 20; padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.dlg { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; max-width: 580px; width: 100%; max-height: 100%; overflow: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.dlg h2.t { margin: 0; font-size: 18px; }
+@media (prefers-reduced-motion: no-preference) { .row, details.rec { transition: border-color 0.15s; } }
+</style>
+</head>
+
+<div class="wrap">
+<body>
+  <header class="top">
+    <div>
+      <h1>휴직 신고 관리대장</h1>
+      <p class="sub">육아휴직 · 육아기 근로시간 단축 · 배우자 출산휴가 &nbsp;|&nbsp; <span id="today" class="mono"></span></p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btn-alert" type="button">마감 알림<span class="badge mono" id="alert-n" hidden>0</span></button>
+      <button class="btn" id="btn-settings" type="button">기준 설정</button>
+      <button class="btn" id="btn-backup" type="button">백업 저장</button>
+      <button class="btn" id="btn-restore" type="button">백업 불러오기</button>
+      <input type="file" id="restore-file" accept=".json,application/json" hidden>
+      <button class="btn primary" id="btn-new" type="button">+ 결재 등록</button>
+    </div>
+  </header>
+
+  <section class="panel" id="settings" hidden>
+    <h2>기준 설정과 근거</h2>
+    <div class="grid">
+      <div class="fld">
+        <label for="s-priority">사업장 구분</label>
+        <select id="s-priority">
+          <option value="1">우선지원대상기업 (지원금·배우자 출산휴가 급여 대상)</option>
+          <option value="0">대규모 기업 (사업주 지원금 없음)</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label for="s-rule">지원금 1차 구간 시작</label>
+        <select id="s-rule">
+          <option value="excl">휴직 시작일이 속한 달의 다음 달부터 (기본)</option>
+          <option value="incl">휴직 시작일이 속한 달부터</option>
+        </select>
+        <span class="hint">두 방식은 첫 신청 가능일이 한 달 차이 납니다. 아래 설명을 확인하세요.</span>
+      </div>
+    </div>
+    <div class="rules">
+      <h3>계산 기준 (2026.10 웹 자료 조사)</h3>
+      <ul>
+        <li>휴직 등 신고서: 휴직·단축 시작일(사유 발생일)부터 14일 이내 근로복지공단에 제출합니다. 기간을 연장하거나 조기 복직하면 변경일부터 14일 이내 내용변경 신고서를 냅니다. 육아기 근로시간 단축은 고용보험료 지원 사업장만 대상입니다. (고용노동부 민원 답변, 근로자 휴직 등 신고서 서식)</li>
+        <li>육아휴직 허용 통지: 근로자 신청일부터 14일 이내(예외 사유 3일 이내)에 서면·전자로 통지합니다. 2025.1.1 시행. (서남권직장맘지원센터)</li>
+        <li>확인서: 근로자는 시작 1개월 후부터 고용24에서 급여를 신청할 수 있어 그 전에 사업주 확인서를 등록해야 합니다. 법정 마감일은 없어 이 도구는 시작 1개월 후를 권장 마감으로 표시합니다.</li>
+        <li>지원금 신청 기한: 휴직·단축이 끝난 다음 날부터 12개월 이내. 지원금의 50%는 3개월 단위로, 나머지 50%는 복직 후 6개월 이상 계속 고용한 뒤 일시금으로 신청합니다. 30일 이상 허용한 우선지원대상기업이 대상입니다. (고용24 육아휴직 지원금 안내)</li>
+        <li>배우자 출산휴가: 20일(근무일 기준) 전부 유급, 출산일부터 120일 이내 사용, 급여 신청은 시작 1개월 후부터 종료 12개월 이내입니다. 사업주 지원금은 없습니다.</li>
+      </ul>
+      <h3>확인이 필요한 부분</h3>
+      <ul>
+        <li>1차 구간 시작: 고용24 안내 문구는 시작일이 속한 달을 제외한다고 쓰고, 같은 안내의 예시(1월 15일 시작은 4월 1일부터 신청)는 시작 달을 포함합니다. 기본값은 더 늦은 쪽입니다. 접수 전에 관할 고용센터(1350)에서 확인하세요.</li>
+        <li>시작 달 중간에 시작한 경우 그 달의 일할 처리는 이 도구가 계산하지 않습니다.</li>
+        <li>배우자 출산휴가 사용 기한이 2026.9.18부터 바뀐다는 블로그 글이 있으나 법령으로 확인하지 못했습니다. 이 도구는 출산일 + 120일로 계산합니다.</li>
+        <li>대체인력 지원금과 업무분담 지원금은 포함하지 않았습니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="panel" id="form" hidden>
+    <h2 id="form-title">결재 등록</h2>
+    <div class="grid">
+      <div class="fld"><label for="f-name">직원 이름</label><input type="text" id="f-name" autocomplete="off"></div>
+      <div class="fld"><label for="f-dept">부서 또는 사번 (선택)</label><input type="text" id="f-dept" autocomplete="off"></div>
+      <div class="fld"><label for="f-type">종류</label>
+        <select id="f-type">
+          <option value="parental">육아휴직</option>
+          <option value="reduced">육아기 근로시간 단축</option>
+          <option value="spouse">배우자 출산휴가</option>
+        </select>
+      </div>
+      <div class="fld"><label for="f-apply">결재(신청)일</label><input type="date" id="f-apply"></div>
+      <div class="fld"><label for="f-start">시작일</label><input type="date" id="f-start"></div>
+      <div class="fld"><label for="f-end">종료일</label><input type="date" id="f-end"></div>
+      <div class="fld" id="w-birth"><label for="f-birth">자녀 출산일</label><input type="date" id="f-birth"><span class="hint">사용 기한(출산일 + 120일) 계산에 씁니다.</span></div>
+      <div class="fld" id="w-ins"><label for="f-ins">고용보험료 지원 사업장</label>
+        <select id="f-ins"><option value="0">아니오</option><option value="1">예 (휴직 등 신고서 필요)</option></select>
+      </div>
+      <div class="fld wide"><label for="f-memo">메모 (선택)</label><input type="text" id="f-memo" autocomplete="off"></div>
+    </div>
+    <div id="f-warn"></div>
+    <div class="preview">
+      <h3>이 결재로 생기는 마감 일정</h3>
+      <ul class="rows" id="f-preview"></ul>
+    </div>
+    <div class="formbtns">
+      <button class="btn" id="f-cancel" type="button">취소</button>
+      <button class="btn primary" id="f-save" type="button">저장</button>
+    </div>
+  </section>
+
+  <div id="banner"></div>
+  <div class="summary" id="summary"></div>
+
+  <div class="bar">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-cal" aria-selected="true" type="button">달력</button>
+      <button role="tab" id="tab-todo" aria-selected="false" type="button">해야 할 일</button>
+      
+      <button role="tab" id="tab-emp" aria-selected="false" type="button">직원별</button>
+    </div>
+    <div class="filters" id="filters"></div>
+  </div>
+
+  <main id="view"></main>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div class="overlay" id="alert" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="alert-title">
+    <h2 class="t" id="alert-title">마감 알림</h2>
+    <div id="alert-body"></div>
+    <p class="meta" style="margin:0;font-size:12.5px">이 알림은 페이지를 열 때 표시됩니다. 메일이나 문자로 보내지는 않습니다.</p>
+    <div class="formbtns"><button class="btn" id="alert-later" type="button">나중에</button><button class="btn primary" id="alert-ok" type="button">확인 (오늘은 다시 안 보기)</button></div>
+  </div>
+</div>
+
+<script>
+// ENGINE_START
+const TYPE = { parental: "육아휴직", reduced: "육아기 근로시간 단축", spouse: "배우자 출산휴가" };
+const p2 = n => String(n).padStart(2, "0");
+const D = {
+  ms(s) { const a = s.split("-").map(Number); return Date.UTC(a[0], a[1] - 1, a[2]); },
+  fmt(ms) { const t = new Date(ms); return t.getUTCFullYear() + "-" + p2(t.getUTCMonth() + 1) + "-" + p2(t.getUTCDate()); },
+  addDays(s, n) { return D.fmt(D.ms(s) + n * 864e5); },
+  addMonths(s, n) {
+    const a = s.split("-").map(Number); const t = a[1] - 1 + n;
+    const y = a[0] + Math.floor(t / 12); const m = ((t % 12) + 12) % 12;
+    const dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    return D.fmt(Date.UTC(y, m, Math.min(a[2], dim)));
+  },
+  diff(a, b) { return Math.round((D.ms(a) - D.ms(b)) / 864e5); }
+};
+const lim12 = end => D.addDays(D.addMonths(D.addDays(end, 1), 12), -1);
+
+function blocks(start, end, rule) {
+  const s = start.split("-").map(Number), e = end.split("-").map(Number);
+  let mi = s[0] * 12 + (s[1] - 1) + (rule === "excl" ? 1 : 0);
+  const endMi = e[0] * 12 + (e[1] - 1);
+  const out = []; let n = 1;
+  while (mi <= endMi) {
+    const last = Math.min(mi + 2, endMi);
+    const fy = Math.floor(mi / 12), fm = mi % 12 + 1, ly = Math.floor(last / 12), lm = last % 12 + 1;
+    const pEnd = D.fmt(Date.UTC(ly, lm, 0));
+    const label = fy + "." + fm + (last > mi ? "~" + (ly !== fy ? ly + "." : "") + lm : "");
+    out.push({ n: n, label: label, periodEnd: pEnd, from: D.addDays(pEnd, 1) });
+    n++; mi += 3;
+  }
+  return out;
+}
+
+function validRec(r) {
+  return !!(r && r.name && r.type && r.apply && r.start && r.end && r.end >= r.start);
+}
+
+function buildTasks(r, cfg) {
+  const T = []; const dur = D.diff(r.end, r.start) + 1; const type = r.type;
+  const CONFIRM = { parental: "육아휴직 확인서 등록", reduced: "육아기 근로시간 단축 확인서 등록", spouse: "배우자 출산휴가 확인서 등록" };
+  if (type === "parental") {
+    T.push({ key: "notice", kind: "task", group: "신고", title: "육아휴직 허용 통지", where: "근로자에게 서면·전자로 통지",
+      due: D.addDays(r.apply, 14), note: "신청일부터 14일 이내(예외 사유는 3일 이내). 정당한 사유 없이 거부할 수 없습니다." });
+  }
+  if (type === "parental" || (type === "reduced" && r.insSupport)) {
+    T.push({ key: "report", kind: "task", group: "신고", title: "근로자 휴직 등 신고서", where: "근로복지공단 고용·산재보험 토탈서비스",
+      due: D.addDays(r.start, 14), note: "시작일부터 14일 이내. 기간 연장·조기 복직 시 변경일부터 14일 이내 내용변경 신고서를 냅니다." });
+  }
+  T.push({ key: "confirm", kind: "task", soft: true, group: "신고", title: CONFIRM[type] + " (고용24)", where: "고용24 기업 서비스",
+    due: D.addMonths(r.start, 1), note: "법정 마감은 없습니다. 근로자가 시작 1개월 후부터 급여를 신청하므로 그 전에 등록합니다." });
+  if (type === "spouse") {
+    if (r.birth) {
+      T.push({ key: "limit", kind: "info", group: "안내", title: "배우자 출산휴가 사용 기한", where: "출산일 + 120일",
+        from: r.birth, due: D.addDays(r.birth, 120), note: "20일(근무일 기준) 전부 유급, 최대 3회 분할 사용." });
+    }
+    if (cfg.priority) {
+      T.push({ key: "wpay", kind: "info", group: "안내", title: "근로자 급여 신청 가능 기간", where: "고용24 (근로자 본인, 사업주 대위신청 가능)",
+        from: D.addMonths(r.start, 1), due: D.addMonths(r.end, 12), note: "우선지원대상기업은 고용보험에서 20일분을 지급합니다. 분할 사용 시 종료 후 일괄 신청합니다." });
+    } else {
+      T.push({ key: "wpay", kind: "info", group: "안내", title: "고용보험 급여 없음", where: "대규모 기업",
+        note: "대규모 기업은 회사가 통상임금 전액을 지급합니다." });
+    }
+    return T;
+  }
+  T.push({ key: "wpay", kind: "info", group: "안내", title: "근로자 급여 신청 가능 기간", where: "고용24 (근로자 본인)",
+    from: D.addMonths(r.start, 1), due: D.addMonths(r.end, 12), note: "시작 1개월 후부터 종료 후 12개월 이내. 기한을 넘기면 받을 수 없습니다." });
+  const name = type === "parental" ? "육아휴직 지원금" : "육아기 근로시간 단축 지원금";
+  if (!cfg.priority) {
+    T.push({ key: "nosub", kind: "info", group: "안내", title: "사업주 지원금 대상 아님", where: "대규모 기업", note: "우선지원대상기업만 신청할 수 있습니다." });
+  } else if (dur < 30) {
+    T.push({ key: "nosub", kind: "info", group: "안내", title: "사업주 지원금 대상 아님", where: "30일 미만", note: "30일 이상 허용해야 지원금을 신청할 수 있습니다." });
+  } else {
+    const deadline = lim12(r.end);
+    const where = "고용24 기업 서비스 → 출산육아기 고용안정장려금";
+    blocks(r.start, r.end, cfg.startRule).forEach(b => {
+      T.push({ key: "sub" + b.n, kind: "task", group: "지원금", title: name + " " + b.n + "차 신청", sub: b.label + "분", where: where,
+        from: b.from, due: deadline,
+        note: (b.n === 1 && type === "parental" ? "자녀 만 12개월 이내이고 3개월 이상 연속 휴직이면 첫 3개월은 월 100만원 특례. " : "") + "해당 구간 지원금의 50%를 신청합니다." });
+    });
+    const pf = D.addMonths(D.addDays(r.end, 1), 6);
+    T.push({ key: "subPost", kind: "task", group: "지원금", title: name + " 잔여 50% 신청", sub: "복직 후 6개월 계속 고용", where: where,
+      from: pf, due: D.addDays(D.addMonths(pf, 12), -1), note: "복직 후 6개월 이상 계속 고용한 경우 일시금으로 신청합니다. 중간에 퇴사하면 받을 수 없습니다." });
+  }
+  return T;
+}
+
+function warnings(r) {
+  const W = [];
+  if (!validRec(r)) return W;
+  const dur = D.diff(r.end, r.start) + 1;
+  if (r.apply > r.start) W.push("결재일이 시작일보다 늦습니다.");
+  if (r.type !== "spouse" && D.diff(r.start, r.apply) < 30) W.push("시작일 30일 전 이후에 신청했습니다. 신청일부터 30일 이내로 시작일을 정해 허용할 수 있습니다.");
+  if (r.type !== "spouse" && dur < 30) W.push("30일 미만이라 사업주 지원금과 육아휴직 급여 요건을 채우지 못합니다.");
+  if (r.type === "spouse" && r.birth && r.end > D.addDays(r.birth, 120)) W.push("종료일이 출산일 + 120일을 넘습니다.");
+  return W;
+}
+
+function taskStatus(t, done, today) {
+  if (done) return { k: "done", big: "완료", label: done };
+  const dd = D.diff(t.due, today);
+  if (dd < 0) return { k: "over", big: "D+" + (-dd), label: "기한 초과", dd: dd };
+  if (t.from && D.diff(t.from, today) > 0) { const w = D.diff(t.from, today); return { k: "wait", big: "D-" + w, label: "신청 시작까지", dd: dd, w: w }; }
+  return { k: dd <= 7 ? "soon" : "open", big: dd === 0 ? "D-day" : "D-" + dd, label: "마감까지", dd: dd };
+}
+// ENGINE_END
+
+(function () {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const WD = ["일", "월", "화", "수", "목", "금", "토"];
+  const dot = s => s.replace(/-/g, ".");
+  const dotW = s => dot(s) + "(" + WD[new Date(D.ms(s)).getUTCDay()] + ")";
+  const todayStr = () => { const n = new Date(); return n.getFullYear() + "-" + p2(n.getMonth() + 1) + "-" + p2(n.getDate()); };
+  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl" }, tab: "cal", filter: "all", showDone: false, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false };
+  let dbNS = null, queue = Promise.resolve(), toastTimer = null;
+  const LS = "leave-tracker-v1";
+
+  function toast(msg) {
+    const el = $("#toast"); el.textContent = msg; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3200);
+  }
+
+  function makeDemo(today) {
+    const a = D.addDays;
+    return [
+      { id: "demo1", name: "김서연", dept: "마케팅팀", type: "parental", apply: a(today, -62), start: a(today, -32), end: a(today, 333), done: { notice: a(today, -50), report: a(today, -30) }, demo: true },
+      { id: "demo2", name: "박준호", dept: "영업팀", type: "spouse", apply: a(today, -6), start: a(today, 2), end: a(today, 29), birth: a(today, -4), done: {}, demo: true },
+      { id: "demo3", name: "이민지", dept: "개발팀", type: "reduced", apply: a(today, -3), start: a(today, 27), end: a(today, 210), insSupport: true, done: {}, demo: true },
+      { id: "demo4", name: "최하늘", dept: "총무팀", type: "parental", apply: a(today, -500), start: a(today, -470), end: a(today, -100), done: { notice: a(today, -490), report: a(today, -465), confirm: a(today, -440), sub1: a(today, -370), sub2: a(today, -280), sub3: a(today, -190), sub4: a(today, -100) }, demo: true }
+    ];
+  }
+  const isDemo = () => state.records.length === 0;
+  const recs = () => (isDemo() ? state.demo : state.records);
+
+  /* ---------- storage ---------- */
+  function loadLocal() {
+    try { const v = JSON.parse(localStorage.getItem(LS) || "null"); if (v) { state.records = v.records || []; state.cfg = Object.assign(state.cfg, v.cfg || {}); } } catch (e) {}
+  }
+  function saveLocal() { try { localStorage.setItem(LS, JSON.stringify({ records: state.records, cfg: state.cfg })); } catch (e) {} }
+  function enqueue(fn) { queue = queue.then(fn).catch(() => toast("저장하지 못했습니다. 이 페이지에 쓰기 권한이 있는지 확인하세요.")); return queue; }
+  function persistRec(rec) {
+    return enqueue(async () => {
+      if (dbNS) { await dbNS.collection("leaves").doc(rec.id).set(rec); return; }
+      const i = state.records.findIndex(x => x.id === rec.id);
+      if (i >= 0) state.records[i] = rec; else state.records.push(rec);
+      saveLocal(); render();
+    });
+  }
+  function removeRec(id) {
+    return enqueue(async () => {
+      if (dbNS) { await dbNS.collection("leaves").doc(id).delete(); return; }
+      state.records = state.records.filter(x => x.id !== id); saveLocal(); render();
+    });
+  }
+  function persistCfg() {
+    return enqueue(async () => {
+      if (dbNS) { await dbNS.doc("config/main").set(state.cfg); return; }
+      saveLocal();
+    });
+  }
+
+  /* ---------- views ---------- */
+  function rowHtml(t, rec, opts) {
+    const done = rec.done && rec.done[t.key];
+    const info = t.kind === "info";
+    let st;
+    if (info) {
+      const today = todayStr();
+      st = { k: "info", big: t.due ? (D.diff(t.due, today) >= 0 ? "~" + dot(t.due).slice(2) : "종료") : "안내", label: "" };
+    } else st = taskStatus(t, done, todayStr());
+    const who = rec.name + " · " + TYPE[rec.type];
+    const dates = t.from && t.due ? '<span>' + (info ? "" : "신청 ") + dot(t.from).slice(2) + " ~</span><b>" + dot(t.due).slice(2) + "</b>"
+      : t.due ? '<span>' + (t.soft ? "권장 마감" : "마감") + '</span><b>' + dot(t.due).slice(2) + "</b>" : "";
+    const chk = !info && opts.check ? '<label class="chk"><input type="checkbox" data-act="done" data-rec="' + esc(rec.id) + '" data-key="' + esc(t.key) + '"' + (done ? " checked" : "") + '> 완료</label>' : "";
+    return '<li class="row ' + st.k + '"><div class="dday"><b>' + esc(st.big) + "</b><small>" + esc(st.label) + "</small></div>" +
+      '<div class="main"><div class="ttl">' + esc(t.title) + (t.sub ? ' <span class="meta">' + esc(t.sub) + "</span>" : "") +
+      (t.soft ? '<span class="tag">권장</span>' : "") + '<span class="tag g-' + esc(t.group) + '">' + esc(t.group) + "</span></div>" +
+      '<div class="meta">' + esc(opts.noWho ? t.where : who + " · " + t.where) + "</div>" +
+      (t.note ? '<div class="note">' + esc(t.note) + "</div>" : "") + "</div>" +
+      '<div class="side mono">' + dates + chk + "</div></li>";
+  }
+
+  function allTasks() {
+    const out = [];
+    recs().forEach(r => { if (validRec(r)) buildTasks(r, state.cfg).forEach(t => out.push({ t: t, r: r })); });
+    return out;
+  }
+
+  function renderSummary(items) {
+    const today = todayStr(); let over = 0, soon = 0, opening = 0;
+    items.forEach(x => {
+      if (x.t.kind !== "task" || (x.r.done && x.r.done[x.t.key])) return;
+      const s = taskStatus(x.t, null, today);
+      if (s.k === "over") over++; else if (s.k === "soon") soon++; else if (s.k === "wait" && s.w <= 30) opening++;
+    });
+    const active = recs().filter(r => validRec(r) && r.start <= today && r.end >= today).length;
+    $("#summary").innerHTML =
+      '<div class="c-over"><b>' + over + "</b><span>기한 초과</span></div>" +
+      '<div class="c-soon"><b>' + soon + "</b><span>7일 안에 마감</span></div>" +
+      "<div><b>" + opening + "</b><span>30일 안에 신청 시작</span></div>" +
+      "<div><b>" + active + "</b><span>지금 휴직·단축 중</span></div>";
+  }
+
+  function renderTodo(items) {
+    const today = todayStr();
+    let list = items.filter(x => x.t.kind === "task");
+    if (state.filter === "report") list = list.filter(x => x.t.group === "신고");
+    if (state.filter === "grant") list = list.filter(x => x.t.group === "지원금");
+    if (!state.showDone) list = list.filter(x => !(x.r.done && x.r.done[x.t.key]));
+    list.forEach(x => { const s = taskStatus(x.t, x.r.done && x.r.done[x.t.key], today); x.sortDate = s.k === "wait" ? x.t.from : x.t.due; x.s = s; });
+    list.sort((a, b) => (a.sortDate < b.sortDate ? -1 : a.sortDate > b.sortDate ? 1 : 0));
+    if (!list.length) return '<div class="empty">처리할 일이 없습니다. 결재를 등록하면 신고·지원금 마감일이 여기에 생깁니다.</div>';
+    const buckets = [["over", "지금 처리 (기한 초과)"], ["w1", "7일 안에"], ["w4", "30일 안에"], ["later", "그 이후"], ["done", "완료"]];
+    const groups = {};
+    list.forEach(x => {
+      let k;
+      if (x.s.k === "done") k = "done";
+      else { const d = D.diff(x.sortDate, today); k = x.s.k === "over" ? "over" : d <= 7 ? "w1" : d <= 30 ? "w4" : "later"; }
+      (groups[k] = groups[k] || []).push(x);
+    });
+    return buckets.filter(b => groups[b[0]]).map(b =>
+      '<h2 class="bucket ' + (b[0] === "over" ? "over" : "") + '">' + b[1] + " " + groups[b[0]].length + '</h2><ul class="rows">' +
+      groups[b[0]].map(x => rowHtml(x.t, x.r, { check: true })).join("") + "</ul>").join("");
+  }
+
+  function renderEmp() {
+    const today = todayStr();
+    const list = recs().filter(validRec).slice().sort((a, b) => (a.start < b.start ? 1 : -1));
+    if (!list.length) return '<div class="empty">등록된 결재가 없습니다.</div>';
+    return list.map(r => {
+      const T = buildTasks(r, state.cfg);
+      const tasks = T.filter(t => t.kind === "task");
+      const doneN = tasks.filter(t => r.done && r.done[t.key]).length;
+      const open = tasks.filter(t => !(r.done && r.done[t.key])).map(t => ({ t: t, s: taskStatus(t, null, today) }));
+      open.forEach(o => { o.d = o.s.k === "wait" ? o.t.from : o.t.due; });
+      open.sort((a, b) => (a.d < b.d ? -1 : 1));
+      const nx = open[0];
+      const next = nx ? '다음: <b>' + esc(nx.t.title) + "</b> · " + (nx.s.k === "wait" ? dotW(nx.t.from) + " 신청 시작 (" + nx.s.big + ")" : dotW(nx.t.due) + " 마감 (" + nx.s.big + ")") : "모든 신고·신청을 마쳤습니다.";
+      const warn = warnings(r).map(w => '<div class="warn">' + esc(w) + "</div>").join("");
+      const demoNote = r.demo ? "" : "";
+      return '<details class="rec" open><summary><div><div class="who">' + esc(r.name) + (r.dept ? ' <span class="meta">' + esc(r.dept) + "</span>" : "") + ' <span class="pill">' + TYPE[r.type] + "</span></div>" +
+        '<div class="period mono">' + dot(r.start) + " ~ " + dot(r.end) + " · 결재 " + dot(r.apply) + "</div></div>" +
+        '<div class="prog">' + doneN + " / " + tasks.length + '</div><div class="next">' + next + "</div></summary>" +
+        '<div class="body">' + warn + (r.memo ? '<div class="meta">메모: ' + esc(r.memo) + "</div>" : "") +
+        '<ul class="rows">' + T.map(t => rowHtml(t, r, { check: true, noWho: true })).join("") + "</ul>" + demoNote +
+        (r.demo ? "" : '<div class="tools"><button class="btn small" type="button" data-act="edit" data-rec="' + esc(r.id) + '">수정</button><button class="btn small danger" type="button" data-act="del" data-rec="' + esc(r.id) + '">삭제</button></div>') +
+        "</div></details>";
+    }).join("");
+  }
+
+  function renderFilters() {
+    if (state.tab !== "todo") { $("#filters").innerHTML = ""; return; }
+    const f = [["all", "전체"], ["report", "신고·확인서"], ["grant", "지원금"]];
+    $("#filters").innerHTML = f.map(x => '<button type="button" class="chip" data-act="filter" data-v="' + x[0] + '" aria-pressed="' + (state.filter === x[0]) + '">' + x[1] + "</button>").join("") +
+      '<button type="button" class="chip" data-act="showdone" aria-pressed="' + state.showDone + '">완료 포함</button>';
+  }
+
+  function render() {
+    $("#today").textContent = dotW(todayStr());
+    $("#banner").innerHTML = isDemo()
+      ? '<div class="banner"><b>예시 데이터입니다.</b> 아래 직원과 일정은 오늘 날짜를 기준으로 만든 예시이며 저장되지 않습니다. 첫 결재를 등록하면 사라집니다.</div>'
+      : (state.mode === "local" ? '<div class="banner">이 브라우저에만 저장됩니다. 브라우저 기록을 지우면 사라지니 가끔 [백업 저장]을 눌러 파일로 보관하세요.</div>' : "");
+    const items = allTasks();
+    renderSummary(items);
+    $("#tab-todo").setAttribute("aria-selected", state.tab === "todo");
+    $("#tab-emp").setAttribute("aria-selected", state.tab === "emp");
+    $("#tab-cal").setAttribute("aria-selected", state.tab === "cal");
+    renderFilters();
+    $("#view").innerHTML = state.tab === "todo" ? renderTodo(items) : state.tab === "cal" ? renderCal() : renderEmp();
+    const an = alertItems().length; const ab = $("#alert-n"); ab.textContent = an; ab.hidden = an === 0;
+    $("#s-priority").value = state.cfg.priority ? "1" : "0";
+    $("#s-rule").value = state.cfg.startRule;
+  }
+
+  /* ---------- calendar ---------- */
+  const SHORT = { notice: "허용 통지", report: "휴직 신고", confirm: "확인서 등록" };
+  const TSHORT = { parental: "육아휴직", reduced: "단축", spouse: "배우자휴가" };
+  const ORD = { over: 0, soon: 1, due: 2, start: 3, done: 4, leave: 5 };
+  function deadlineKind(date, done, today) {
+    if (done) return "done";
+    const d = D.diff(date, today);
+    return d < 0 ? "over" : d <= 7 ? "soon" : "due";
+  }
+  function calEvents() {
+    const ev = []; const today = todayStr();
+    recs().forEach(r => {
+      if (!validRec(r)) return;
+      const dn = k => !!(r.done && r.done[k]);
+      ev.push({ d: r.start, text: r.name + " " + TSHORT[r.type] + " 시작", k: "leave", r: r });
+      ev.push({ d: D.addDays(r.end, 1), text: r.name + " " + TSHORT[r.type] + " 복직", k: "leave", r: r });
+      const T = buildTasks(r, state.cfg);
+      const subs = T.filter(t => /^sub\d+$/.test(t.key));
+      T.forEach(t => {
+        if (t.kind !== "task") return;
+        if (/^sub\d+$/.test(t.key)) {
+          ev.push({ d: t.from, text: r.name + " " + t.key.slice(3) + "차 신청 가능", k: dn(t.key) ? "done" : "start", t: t, r: r });
+        } else if (t.key === "subPost") {
+          ev.push({ d: t.from, text: r.name + " 잔여 50% 신청 가능", k: dn(t.key) ? "done" : "start", t: t, r: r });
+          ev.push({ d: t.due, text: r.name + " 잔여 50% 신청 마감", k: deadlineKind(t.due, dn(t.key), today), t: t, r: r });
+        } else {
+          ev.push({ d: t.due, text: r.name + " " + SHORT[t.key] + " 마감", k: deadlineKind(t.due, dn(t.key), today), t: t, r: r });
+        }
+      });
+      if (subs.length) {
+        const undone = subs.filter(t => !dn(t.key));
+        ev.push({ d: subs[0].due, text: r.name + " 지원금 1~" + subs.length + "차 신청 최종 마감", k: deadlineKind(subs[0].due, undone.length === 0, today), t: undone[0] || subs[0], r: r });
+      }
+    });
+    return ev;
+  }
+  function renderCal() {
+    const y = state.calY, m = state.calM, today = todayStr(), sel = state.sel || today;
+    const startOff = new Date(Date.UTC(y, m, 1)).getUTCDay();
+    const dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    const weeks = Math.ceil((startOff + dim) / 7);
+    const by = {};
+    calEvents().forEach(e => { (by[e.d] = by[e.d] || []).push(e); });
+    Object.keys(by).forEach(k => by[k].sort((a, b) => ORD[a.k] - ORD[b.k]));
+    let cells = WD.map((w, i) => '<div class="wd' + (i === 0 ? " sun" : "") + '">' + w + "</div>").join("");
+    for (let i = 0; i < weeks * 7; i++) {
+      const n = i - startOff + 1, out = n < 1 || n > dim, ms = Date.UTC(y, m, n), ds = D.fmt(ms), list = by[ds] || [];
+      cells += '<button type="button" class="cd' + (out ? " out" : "") + (ds === today ? " today" : "") + (ds === sel ? " sel" : "") + '" data-act="calsel" data-d="' + ds + '"><span class="dn mono">' + new Date(ms).getUTCDate() + '</span><span class="cdev">' +
+        list.slice(0, 3).map(e => '<span class="ev ' + e.k + '" title="' + esc(e.text) + '"><span class="t">' + esc(e.text) + "</span></span>").join("") +
+        (list.length > 3 ? '<span class="more mono">+' + (list.length - 3) + "</span>" : "") + "</span></button>";
+    }
+    const seen = {};
+    const rows = (by[sel] || []).map(e => {
+      if (e.t) { const k = e.r.id + ":" + e.t.key; if (seen[k]) return ""; seen[k] = 1; return rowHtml(e.t, e.r, { check: true }); }
+      return '<li class="row info"><div class="dday"><b>안내</b><small></small></div><div class="main"><div class="ttl">' + esc(e.text) + '</div><div class="meta">' + esc(TYPE[e.r.type]) + " · " + dot(e.r.start) + " ~ " + dot(e.r.end) + '</div></div><div class="side"></div></li>';
+    }).join("");
+    const lg = [["over", "기한 초과"], ["soon", "7일 안에 마감"], ["due", "마감일"], ["start", "신청 가능일"], ["done", "완료"], ["leave", "휴직 시작·복직"]];
+    return '<div class="calhead"><div class="calnav"><button type="button" class="btn small" data-act="calprev" aria-label="이전 달">‹</button><span class="mo mono">' + y + "년 " + (m + 1) + '월</span><button type="button" class="btn small" data-act="calnext" aria-label="다음 달">›</button></div><button type="button" class="btn small" data-act="caltoday">오늘</button></div>' +
+      '<div class="cal">' + cells + '</div><div class="legend">' + lg.map(x => '<span class="ev ' + x[0] + '"><span class="t">' + x[1] + "</span></span>").join("") + "</div>" +
+      '<h2 class="bucket">' + dotW(sel) + '</h2>' + (rows ? '<ul class="rows">' + rows + "</ul>" : '<div class="empty">이 날 일정이 없습니다.</div>');
+  }
+
+  /* ---------- alert ---------- */
+  let alerted = false;
+  const ALERT_KEY = "leave-alert-day";
+  function alertItems() {
+    const today = todayStr(), out = [];
+    allTasks().forEach(x => {
+      if (x.t.kind !== "task" || (x.r.done && x.r.done[x.t.key])) return;
+      const s = taskStatus(x.t, null, today);
+      if (s.k === "over") out.push({ sec: 0, d: x.t.due, x: x });
+      else if (s.k === "soon") out.push({ sec: 1, d: x.t.due, x: x });
+      else if (s.k === "wait" && s.w <= 7) out.push({ sec: 2, d: x.t.from, x: x });
+    });
+    out.sort((a, b) => a.sec - b.sec || (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+    return out;
+  }
+  function showAlert() {
+    const items = alertItems();
+    const heads = ["기한이 지났습니다", "7일 안에 마감됩니다", "7일 안에 신청이 시작됩니다"];
+    let html = "";
+    if (!items.length) html = '<div class="empty">7일 안에 마감되는 일이 없습니다.</div>';
+    [0, 1, 2].forEach(s => {
+      const g = items.filter(i => i.sec === s); if (!g.length) return;
+      html += '<h2 class="bucket ' + (s === 0 ? "over" : "") + '">' + heads[s] + " " + g.length + '</h2><ul class="rows">' + g.map(i => rowHtml(i.x.t, i.x.r, { check: false })).join("") + "</ul>";
+    });
+    $("#alert-body").innerHTML = html;
+    $("#alert").hidden = false; $("#alert-ok").focus();
+  }
+  function closeAlert(remember) {
+    $("#alert").hidden = true;
+    if (remember) { try { localStorage.setItem(ALERT_KEY, todayStr()); } catch (e) {} }
+  }
+  function maybeAlert() {
+    if (alerted || !state.ready) return;
+    alerted = true;
+    if (isDemo()) return;
+    let seenDay = null; try { seenDay = localStorage.getItem(ALERT_KEY); } catch (e) {}
+    if (seenDay === todayStr()) return;
+    if (alertItems().length) showAlert();
+  }
+  $("#btn-alert").addEventListener("click", showAlert);
+  $("#alert-ok").addEventListener("click", () => closeAlert(true));
+  $("#alert-later").addEventListener("click", () => closeAlert(false));
+  $("#alert").addEventListener("click", e => { if (e.target.id === "alert") closeAlert(false); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#alert").hidden) closeAlert(false); });
+
+  /* ---------- form ---------- */
+  function readForm() {
+    return { id: state.editing ? state.editing.id : "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+      name: $("#f-name").value.trim(), dept: $("#f-dept").value.trim(), type: $("#f-type").value,
+      apply: $("#f-apply").value, start: $("#f-start").value, end: $("#f-end").value,
+      birth: $("#f-birth").value, insSupport: $("#f-ins").value === "1", memo: $("#f-memo").value.trim(),
+      done: state.editing ? Object.assign({}, state.editing.done) : {} };
+  }
+  function syncTypeFields() {
+    const t = $("#f-type").value;
+    $("#w-birth").hidden = t !== "spouse"; $("#w-ins").hidden = t !== "reduced";
+  }
+  function updatePreview() {
+    syncTypeFields();
+    const r = readForm();
+    if (!r.name) r.name = "(이름)";
+    if (!validRec(r)) { $("#f-preview").innerHTML = '<li class="meta">결재일·시작일·종료일을 입력하면 마감 일정이 나타납니다. 종료일은 시작일 이후여야 합니다.</li>'; $("#f-warn").innerHTML = ""; return; }
+    $("#f-warn").innerHTML = warnings(r).map(w => '<div class="warn">' + esc(w) + "</div>").join("");
+    $("#f-preview").innerHTML = buildTasks(r, state.cfg).map(t => rowHtml(t, r, { check: false, noWho: true })).join("");
+  }
+  function openForm(rec) {
+    state.editing = rec || null;
+    $("#form-title").textContent = rec ? "결재 수정" : "결재 등록";
+    const v = rec || { name: "", dept: "", type: "parental", apply: todayStr(), start: "", end: "", birth: "", insSupport: false, memo: "" };
+    $("#f-name").value = v.name; $("#f-dept").value = v.dept || ""; $("#f-type").value = v.type;
+    $("#f-apply").value = v.apply; $("#f-start").value = v.start; $("#f-end").value = v.end;
+    $("#f-birth").value = v.birth || ""; $("#f-ins").value = v.insSupport ? "1" : "0"; $("#f-memo").value = v.memo || "";
+    $("#form").hidden = false; updatePreview();
+    $("#form").scrollIntoView({ block: "start" }); $("#f-name").focus({ preventScroll: true });
+  }
+  function saveForm() {
+    const r = readForm();
+    if (!r.name) { toast("직원 이름을 입력하세요."); return; }
+    if (!validRec(r)) { toast("결재일, 시작일, 종료일을 확인하세요."); return; }
+    if (r.type === "spouse" && !r.birth) delete r.birth;
+    persistRec(r).then(() => { $("#form").hidden = true; state.editing = null; state.tab = "emp"; render(); toast("저장했습니다."); });
+  }
+
+  /* ---------- events ---------- */
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-act]"); if (!b) return;
+    const act = b.dataset.act;
+    if (act === "filter") { state.filter = b.dataset.v; render(); }
+    else if (act === "showdone") { state.showDone = !state.showDone; render(); }
+    else if (act === "calprev") { state.calM--; if (state.calM < 0) { state.calM = 11; state.calY--; } render(); }
+    else if (act === "calnext") { state.calM++; if (state.calM > 11) { state.calM = 0; state.calY++; } render(); }
+    else if (act === "caltoday") { const n = new Date(); state.calY = n.getFullYear(); state.calM = n.getMonth(); state.sel = todayStr(); render(); }
+    else if (act === "calsel") { state.sel = b.dataset.d; const a = b.dataset.d.split("-").map(Number); state.calY = a[0]; state.calM = a[1] - 1; render(); }
+    else if (act === "edit") { const r = state.records.find(x => x.id === b.dataset.rec); if (r) openForm(r); }
+    else if (act === "del") {
+      if (b.dataset.armed) { removeRec(b.dataset.rec); toast("삭제했습니다."); }
+      else { b.dataset.armed = "1"; b.classList.add("armed"); b.textContent = "한 번 더 누르면 삭제"; setTimeout(() => { b.dataset.armed = ""; b.classList.remove("armed"); b.textContent = "삭제"; }, 3500); }
+    }
+  });
+  document.addEventListener("change", e => {
+    const c = e.target.closest('[data-act="done"]'); if (!c) return;
+    const base = recs().find(x => x.id === c.dataset.rec); if (!base) return;
+    const nr = Object.assign({}, base, { done: Object.assign({}, base.done) });
+    if (c.checked) nr.done[c.dataset.key] = todayStr(); else delete nr.done[c.dataset.key];
+    if (base.demo) { state.demo = state.demo.map(x => (x.id === nr.id ? nr : x)); render(); } else persistRec(nr);
+  });
+  $("#tab-todo").addEventListener("click", () => { state.tab = "todo"; render(); });
+  $("#tab-emp").addEventListener("click", () => { state.tab = "emp"; render(); });
+  $("#tab-cal").addEventListener("click", () => { state.tab = "cal"; render(); });
+  $("#btn-new").addEventListener("click", () => openForm(null));
+  $("#btn-settings").addEventListener("click", () => { const s = $("#settings"); s.hidden = !s.hidden; });
+  $("#f-cancel").addEventListener("click", () => { $("#form").hidden = true; state.editing = null; });
+  $("#f-save").addEventListener("click", saveForm);
+  ["f-name", "f-dept", "f-type", "f-apply", "f-start", "f-end", "f-birth", "f-ins", "f-memo"].forEach(id => {
+    $("#" + id).addEventListener("input", updatePreview); $("#" + id).addEventListener("change", updatePreview);
+  });
+  $("#f-start").addEventListener("change", () => { if (!$("#f-end").value && $("#f-start").value) { /* 종료일은 직접 입력 */ } });
+  $("#s-priority").addEventListener("change", e => { state.cfg.priority = e.target.value === "1"; persistCfg(); render(); });
+  $("#s-rule").addEventListener("change", e => { state.cfg.startRule = e.target.value; persistCfg(); render(); });
+
+  /* ---------- backup / restore ---------- */
+  $("#btn-backup").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify({ app: "leave-tracker", at: new Date().toISOString(), records: state.records, cfg: state.cfg }, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "휴직관리_백업_" + todayStr() + ".json";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast("백업 파일을 저장했습니다.");
+  });
+  $("#btn-restore").addEventListener("click", () => $("#restore-file").click());
+  $("#restore-file").addEventListener("change", e => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      try {
+        const v = JSON.parse(rd.result);
+        if (!v || !Array.isArray(v.records)) throw new Error("bad");
+        if (!confirm("현재 데이터를 백업 파일 내용으로 바꿉니다. 계속할까요?")) return;
+        state.records = v.records; state.cfg = Object.assign(state.cfg, v.cfg || {});
+        if (dbNS) { state.records.forEach(r => persistRec(r)); persistCfg(); } else { saveLocal(); render(); }
+        toast("불러왔습니다. (" + v.records.length + "건)");
+      } catch (err) { toast("백업 파일을 읽지 못했습니다."); }
+    };
+    rd.readAsText(f);
+  });
+
+  /* ---------- boot ---------- */
+  state.demo = makeDemo(todayStr());
+  render();
+  (async function boot() {
+    try { dbNS = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { dbNS = null; }
+    if (dbNS) {
+      state.mode = "shared";
+      try {
+        dbNS.collection("leaves").onSnapshot(s => { state.records = s.docs.map(d => Object.assign({}, d.data(), { id: d.id })); state.ready = true; render(); maybeAlert(); },
+          () => { dbNS = null; state.mode = "local"; loadLocal(); render(); });
+        dbNS.doc("config/main").onSnapshot(s => { if (s.exists) { state.cfg = Object.assign(state.cfg, s.data()); render(); } }, () => {});
+      } catch (e) { dbNS = null; state.mode = "local"; loadLocal(); render(); }
+    } else { loadLocal(); state.ready = true; render(); maybeAlert(); }
+  })();
+})();
+</script>
+</body>
+</html>
