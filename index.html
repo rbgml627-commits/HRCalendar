@@ -154,6 +154,18 @@ details.rec > summary::-webkit-details-marker { display: none; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 6px; font-size: 13px; z-index: 10; max-width: calc(100% - 32px); }
 .badge { display: inline-block; min-width: 1.4em; padding: 0 6px; border-radius: 999px; background: var(--over); color: var(--surface); font-size: 12px; text-align: center; margin-left: 4px; }
 
+
+details.rec.hot { border-color: var(--soon); box-shadow: inset 5px 0 0 var(--soon); }
+details.rec.hot > summary { background: var(--soon-soft); border-radius: 8px; }
+details.rec.hot > summary .next { color: var(--soon); font-weight: 600; }
+details.rec.hot.over { border-color: var(--over); box-shadow: inset 5px 0 0 var(--over); }
+details.rec.hot.over > summary { background: var(--over-soft); }
+details.rec.hot.over > summary .next { color: var(--over); }
+details.rec.emp { margin-bottom: 10px; }
+details.rec.emp > .body { display: flex; flex-direction: column; gap: 8px; }
+details.rec.sub { background: var(--surface-2); }
+details.rec.sub > summary { padding: 9px 12px; }
+details.rec.sub .who { font-size: 14px; }
 .amt { font-family: var(--font-mono); font-size: 12.5px; color: var(--ok); font-variant-numeric: tabular-nums; }
 .money { display: flex; flex-direction: column; gap: 18px; }
 .mgrp { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -297,6 +309,9 @@ details.rec > summary::-webkit-details-marker { display: none; }
       <div class="fld" id="w-inc"><label for="f-inc">인센티브 월 +10만원</label>
         <select id="f-inc"><option value="0">해당 없음</option><option value="1">해당 (사업장에서 1~3번째로 허용한 사례)</option></select>
       </div>
+      <div class="fld wide" id="w-post"><label for="f-post">이미 복직한 이력 입력</label>
+        <select id="f-post"><option value="0">아니오 (신고·지원금 전체 일정 관리)</option><option value="1">예 (복직 후 6개월 뒤 잔여 50% 지원금 신청만 관리)</option></select>
+      </div>
       <div class="fld wide"><label for="f-memo">메모 (선택)</label><input type="text" id="f-memo" autocomplete="off"></div>
     </div>
     <div id="f-warn"></div>
@@ -374,7 +389,7 @@ function validRec(r) {
   return !!(r && r.name && r.type && r.apply && r.start && r.end && r.end >= r.start);
 }
 
-function buildTasks(r, cfg) {
+function buildTasksAll(r, cfg) {
   const T = []; const dur = D.diff(r.end, r.start) + 1; const type = r.type;
   const CONFIRM = { parental: "육아휴직 확인서 등록", reduced: "육아기 근로시간 단축 확인서 등록", spouse: "배우자 출산휴가 확인서 등록" };
   if (type === "parental") {
@@ -457,9 +472,14 @@ function subAmt(r, cfg, key) {
   const b = S.blocks.find(x => x.key === key); return b ? b.pay : null;
 }
 
+function buildTasks(r, cfg) {
+  const T = buildTasksAll(r, cfg);
+  return r.postOnly ? T.filter(t => t.key === "subPost" || t.key === "nosub") : T;
+}
+
 function warnings(r) {
   const W = [];
-  if (!validRec(r)) return W;
+  if (!validRec(r) || r.postOnly) return W;
   const dur = D.diff(r.end, r.start) + 1;
   if (r.apply > r.start) W.push("결재일이 시작일보다 늦습니다.");
   if (r.type !== "spouse" && D.diff(r.start, r.apply) < 30) W.push("시작일 30일 전 이후에 신청했습니다. 신청일부터 30일 이내로 시작일을 정해 허용할 수 있습니다.");
@@ -484,7 +504,7 @@ function taskStatus(t, done, today) {
   const dot = s => s.replace(/-/g, ".");
   const dotW = s => dot(s) + "(" + WD[new Date(D.ms(s)).getUTCDay()] + ")";
   const todayStr = () => { const n = new Date(); return n.getFullYear() + "-" + p2(n.getMonth() + 1) + "-" + p2(n.getDate()); };
-  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl", base: 300000, special: 1000000, special25: 2000000, inc: 100000 }, tab: "cal", filter: "all", showDone: false, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false };
+  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl", base: 300000, special: 1000000, special25: 2000000, inc: 100000 }, tab: "cal", filter: "all", showDone: false, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false, openG: {}, openR: {} };
   let dbNS = null, queue = Promise.resolve(), toastTimer = null;
   const LS = "leave-tracker-v1";
 
@@ -609,49 +629,71 @@ function taskStatus(t, done, today) {
       groups[b[0]].map(x => rowHtml(x.t, x.r, { check: true })).join("") + "</ul>").join("");
   }
 
-  function empCard(r) {
-      const today = todayStr();
-      const T = buildTasks(r, state.cfg);
-      const tasks = T.filter(t => t.kind === "task");
-      const doneN = tasks.filter(t => r.done && r.done[t.key]).length;
-      const open = tasks.filter(t => !(r.done && r.done[t.key])).map(t => ({ t: t, s: taskStatus(t, null, today) }));
-      open.forEach(o => { o.d = o.s.k === "wait" ? o.t.from : o.t.due; });
-      open.sort((a, b) => (a.d < b.d ? -1 : 1));
-      const nx = open[0];
-      const next = nx ? '다음: <b>' + esc(nx.t.title) + "</b> · " + (nx.s.k === "wait" ? dotW(nx.t.from) + " 신청 시작 (" + nx.s.big + ")" : dotW(nx.t.due) + " 마감 (" + nx.s.big + ")") : "모든 신고·신청을 마쳤습니다.";
-      const warn = warnings(r).map(w => '<div class="warn">' + esc(w) + "</div>").join("");
-      const demoNote = r.demo ? "" : "";
-      return '<details class="rec" open><summary><div><div class="who">' + esc(r.name) + (r.dept ? ' <span class="meta">' + esc(r.dept) + "</span>" : "") + ' <span class="pill">' + TYPE[r.type] + "</span></div>" +
-        '<div class="period mono">' + dot(r.start) + " ~ " + dot(r.end) + " · 결재 " + dot(r.apply) + "</div></div>" +
-        '<div class="prog">' + doneN + " / " + tasks.length + '</div><div class="next">' + next + "</div></summary>" +
-        '<div class="body">' + warn + (r.memo ? '<div class="meta">메모: ' + esc(r.memo) + "</div>" : "") +
-        '<ul class="rows">' + T.map(t => rowHtml(t, r, { check: true, noWho: true })).join("") + "</ul>" + demoNote +
-        (r.demo ? "" : '<div class="tools"><button class="btn small" type="button" data-act="edit" data-rec="' + esc(r.id) + '">수정</button><button class="btn small danger" type="button" data-act="del" data-rec="' + esc(r.id) + '">삭제</button></div>') +
-        "</div></details>";
+  function openTasks(r) {
+    const today = todayStr();
+    return buildTasks(r, state.cfg).filter(t => t.kind === "task" && !(r.done && r.done[t.key])).map(t => {
+      const s = taskStatus(t, null, today);
+      return { t: t, s: s, r: r, d: s.k === "wait" ? t.from : t.due };
+    }).sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+  }
+  function nextHtml(o, label) {
+    if (!o) return "모든 신고·신청을 마쳤습니다.";
+    const n = label && NTH[o.r.id] ? "[" + NTH[o.r.id] + "회] " : "";
+    return "다음: <b>" + esc(n + o.t.title) + "</b> · " + (o.s.k === "wait" ? dotW(o.t.from) + " 신청 시작 (" + o.s.big + ")" : dotW(o.t.due) + " 마감 (" + o.s.big + ")");
+  }
+  function hotCls(o) {
+    if (!o) return "";
+    const d = D.diff(o.d, todayStr());
+    return d < 0 ? " hot over" : d <= 20 ? " hot" : "";
+  }
+  function recBlock(r) {
+    const T = buildTasks(r, state.cfg);
+    const tasks = T.filter(t => t.kind === "task");
+    const doneN = tasks.filter(t => r.done && r.done[t.key]).length;
+    const nx = openTasks(r)[0];
+    const warn = warnings(r).map(w => '<div class="warn">' + esc(w) + "</div>").join("");
+    const title = (NTH[r.id] ? "[" + NTH[r.id] + "회] " : "") + TYPE[r.type] + (r.postOnly ? " · 복직 후 지원금만" : "");
+    return '<details class="rec sub' + hotCls(nx) + '" data-rk="' + esc(r.id) + '"' + (state.openR[r.id] ? " open" : "") + '><summary><div><div class="who">' + esc(title) + "</div>" +
+      '<div class="period mono">' + dot(r.start) + " ~ " + dot(r.end) + " · 결재 " + dot(r.apply) + "</div></div>" +
+      '<div class="prog">' + doneN + " / " + tasks.length + '</div><div class="next">' + nextHtml(nx, false) + "</div></summary>" +
+      '<div class="body">' + warn + (r.memo ? '<div class="meta">메모: ' + esc(r.memo) + "</div>" : "") +
+      '<ul class="rows">' + T.map(t => rowHtml(t, r, { check: true, noWho: true })).join("") + "</ul>" +
+      (r.demo ? "" : '<div class="tools"><button class="btn small" type="button" data-act="edit" data-rec="' + esc(r.id) + '">수정</button><button class="btn small danger" type="button" data-act="del" data-rec="' + esc(r.id) + '">삭제</button></div>') +
+      "</div></details>";
   }
 
   function renderEmp() {
     const list = recs().filter(validRec);
     if (!list.length) return '<div class="empty">등록된 결재가 없습니다.</div>';
     const groups = {};
-    list.forEach(r => { const k = r.name + "|" + (r.dept || ""); (groups[k] = groups[k] || []).push(r); });
-    const gl = Object.keys(groups).map(k => groups[k].slice().sort((a, b) => (a.start < b.start ? 1 : -1)));
-    gl.sort((a, b) => (a[0].start < b[0].start ? 1 : -1));
-    return gl.map(g => {
-      const h = g[0];
+    list.forEach(r => { const k = r.name + "|" + (r.dept || ""); (groups[k] = groups[k] || { k: k, g: [] }).g.push(r); });
+    const gl = Object.keys(groups).map(k => {
+      const g = groups[k].g.slice().sort((a, b) => (a.start < b.start ? -1 : 1));
+      const open = []; g.forEach(r => openTasks(r).forEach(o => open.push(o)));
+      open.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
+      return { k: k, g: g, nx: open[0] };
+    });
+    gl.sort((a, b) => { const x = a.nx ? a.nx.d : "9999", y = b.nx ? b.nx.d : "9999"; return x < y ? -1 : x > y ? 1 : 0; });
+    return gl.map(G => {
+      const g = G.g, h = g[0];
+      let doneN = 0, allN = 0;
+      g.forEach(r => { const ts = buildTasks(r, state.cfg).filter(t => t.kind === "task"); allN += ts.length; doneN += ts.filter(t => r.done && r.done[t.key]).length; });
       const days = r => D.diff(r.end, r.start) + 1;
       const sums = Object.keys(TYPE).map(t => {
         const x = g.filter(r => r.type === t); if (!x.length) return "";
         const tot = x.reduce((n, r) => n + days(r), 0);
         return TYPE[t] + " " + x.length + "회 · 총 " + tot + "일 (약 " + (Math.round(tot / 30.4 * 10) / 10) + "개월)";
       }).filter(Boolean);
-      const asc = g.slice().sort((a, b) => (a.start < b.start ? -1 : 1)); const ov = [];
-      for (let i = 1; i < asc.length; i++) for (let j = 0; j < i; j++) if (asc[i].start <= asc[j].end) { ov.push(dot(asc[j].start) + "~" + dot(asc[j].end) + " 와 " + dot(asc[i].start) + "~" + dot(asc[i].end)); break; }
-      const head = g.length > 1 || !h.demo ? '<div class="grp"><div class="grp-h"><b>' + esc(h.name) + "</b>" + (h.dept ? ' <span class="meta">' + esc(h.dept) + "</span>" : "") +
-        '<div class="meta">' + esc(sums.join("  /  ")) + "</div>" +
-        (ov.length ? '<div class="warn">기간이 겹치는 결재가 있습니다: ' + esc(ov.join(", ")) + "</div>" : "") + "</div>" +
-        (h.demo ? "" : '<button class="btn small" type="button" data-act="again" data-rec="' + esc(asc[asc.length - 1].id) + '">+ 이어서 등록</button>') + "</div>" : "";
-      return '<section class="grpwrap">' + head + g.map(empCard).join("") + "</section>";
+      const pills = Object.keys(TYPE).map(t => { const n = g.filter(r => r.type === t).length; return n ? '<span class="pill">' + TYPE[t] + (n > 1 ? " " + n + "회" : "") + "</span>" : ""; }).join(" ");
+      const ov = [];
+      for (let i = 1; i < g.length; i++) for (let j = 0; j < i; j++) if (g[i].start <= g[j].end) { ov.push(dot(g[j].start) + "~" + dot(g[j].end) + " 와 " + dot(g[i].start) + "~" + dot(g[i].end)); break; }
+      const last = g[g.length - 1];
+      return '<details class="rec emp' + hotCls(G.nx) + '" data-gk="' + esc(G.k) + '"' + (state.openG[G.k] ? " open" : "") + '><summary><div><div class="who">' + esc(h.name) + (h.dept ? ' <span class="meta">' + esc(h.dept) + "</span>" : "") + " " + pills + "</div>" +
+        '<div class="period mono">' + esc(sums.join("  /  ")) + "</div></div>" +
+        '<div class="prog">' + doneN + " / " + allN + '</div><div class="next">' + nextHtml(G.nx, true) + "</div></summary>" +
+        '<div class="body">' + (ov.length ? '<div class="warn">기간이 겹치는 결재가 있습니다: ' + esc(ov.join(", ")) + "</div>" : "") +
+        (h.demo ? "" : '<div class="tools"><button class="btn small" type="button" data-act="again" data-rec="' + esc(last.id) + '">+ 이어서 등록</button></div>') +
+        g.map(recBlock).join("") + "</div></details>";
     }).join("");
   }
 
@@ -668,10 +710,10 @@ function taskStatus(t, done, today) {
       let tot = 0, dn = 0;
       const recsHtml = g.map(r => {
         const S = subsidy(r, state.cfg);
-        const head = nm(r) + " · " + TYPE[r.type] + " · " + dot(r.start) + " ~ " + dot(r.end);
+        const head = nm(r) + " · " + TYPE[r.type] + " · " + dot(r.start) + " ~ " + dot(r.end) + (r.postOnly ? " · 복직 후 지원금만" : "");
         if (r.type === "spouse") return '<div class="mrec"><h4>' + esc(head) + '</h4><div class="meta">배우자 출산휴가는 사업주 지원금이 없습니다.</div></div>';
         if (!S) return '<div class="mrec"><h4>' + esc(head) + '</h4><div class="meta">30일 미만이라 지원금 대상이 아닙니다.</div></div>';
-        const rows = S.blocks.filter(b => b.months > 0).map(b => {
+        const rows = S.blocks.filter(b => b.months > 0 && !r.postOnly).map(b => {
           const d = r.done && r.done[b.key]; tot += b.pay; if (d) dn += b.pay;
           return [b.n + "차", b.label + "분 (" + (Math.round(b.months * 10) / 10) + "개월분" + (b.spMonths ? ", 특례 " + (Math.round(b.spMonths * 10) / 10) + "개월" : "") + ")", dot(b.from).slice(2) + " ~", b.pay, b.key, d];
         });
@@ -697,6 +739,11 @@ function taskStatus(t, done, today) {
   }
 
   function render() {
+    const y = window.scrollY;
+    renderInner();
+    if (Math.abs(window.scrollY - y) > 1) window.scrollTo(0, y);
+  }
+  function renderInner() {
     $("#today").textContent = dotW(todayStr());
     $("#banner").innerHTML = isDemo()
       ? '<div class="banner"><b>예시 데이터입니다.</b> 아래 직원과 일정은 오늘 날짜를 기준으로 만든 예시이며 저장되지 않습니다. 첫 결재를 등록하면 사라집니다.</div>'
@@ -730,8 +777,10 @@ function taskStatus(t, done, today) {
     recs().forEach(r => {
       if (!validRec(r)) return;
       const dn = k => !!(r.done && r.done[k]);
-      ev.push({ d: r.start, text: nm(r) + " " + TSHORT[r.type] + " 시작", k: "leave", r: r });
-      ev.push({ d: D.addDays(r.end, 1), text: nm(r) + " " + TSHORT[r.type] + " 복직", k: "leave", r: r });
+      if (!r.postOnly) {
+        ev.push({ d: r.start, text: nm(r) + " " + TSHORT[r.type] + " 시작", k: "leave", r: r });
+        ev.push({ d: D.addDays(r.end, 1), text: nm(r) + " " + TSHORT[r.type] + " 복직", k: "leave", r: r });
+      }
       const T = buildTasks(r, state.cfg);
       const subs = T.filter(t => /^sub\d+$/.test(t.key));
       T.forEach(t => {
@@ -858,12 +907,12 @@ function taskStatus(t, done, today) {
     return { id: state.editing ? state.editing.id : "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       name: $("#f-name").value.trim(), dept: $("#f-dept").value.trim(), type: $("#f-type").value,
       apply: getDate("f-apply"), start: getDate("f-start"), end: getDate("f-end"),
-      birth: getDate("f-birth"), insSupport: $("#f-ins").value === "1", special: $("#f-sp").value === "1", incentive: $("#f-inc").value === "1", memo: $("#f-memo").value.trim(),
+      birth: getDate("f-birth"), insSupport: $("#f-ins").value === "1", special: $("#f-sp").value === "1", incentive: $("#f-inc").value === "1", postOnly: $("#f-post").value === "1" && $("#f-type").value !== "spouse", memo: $("#f-memo").value.trim(),
       done: state.editing ? Object.assign({}, state.editing.done) : {} };
   }
   function syncTypeFields() {
     const t = $("#f-type").value;
-    $("#w-birth").hidden = t !== "spouse"; $("#w-ins").hidden = t !== "reduced"; $("#w-sp").hidden = t !== "parental"; $("#w-inc").hidden = t === "spouse";
+    $("#w-birth").hidden = t !== "spouse"; $("#w-ins").hidden = t !== "reduced"; $("#w-sp").hidden = t !== "parental"; $("#w-inc").hidden = t === "spouse"; $("#w-post").hidden = t === "spouse";
   }
   function updatePreview() {
     syncTypeFields();
@@ -879,7 +928,7 @@ function taskStatus(t, done, today) {
     const v = rec || { name: "", dept: "", type: "parental", apply: todayStr(), start: "", end: "", birth: "", insSupport: false, memo: "" };
     $("#f-name").value = v.name; $("#f-dept").value = v.dept || ""; $("#f-type").value = v.type;
     setDate("f-apply", v.apply); setDate("f-start", v.start); setDate("f-end", v.end);
-    setDate("f-birth", v.birth); $("#f-ins").value = v.insSupport ? "1" : "0"; $("#f-sp").value = v.special ? "1" : "0"; $("#f-inc").value = v.incentive ? "1" : "0"; $("#f-memo").value = v.memo || "";
+    setDate("f-birth", v.birth); $("#f-ins").value = v.insSupport ? "1" : "0"; $("#f-sp").value = v.special ? "1" : "0"; $("#f-inc").value = v.incentive ? "1" : "0"; $("#f-post").value = v.postOnly ? "1" : "0"; $("#f-memo").value = v.memo || "";
     $("#form").hidden = false; updatePreview();
     $("#form").scrollIntoView({ block: "start" }); $("#f-name").focus({ preventScroll: true });
   }
@@ -911,6 +960,10 @@ function taskStatus(t, done, today) {
       else { b.dataset.armed = "1"; b.classList.add("armed"); b.textContent = "한 번 더 누르면 삭제"; setTimeout(() => { b.dataset.armed = ""; b.classList.remove("armed"); b.textContent = "삭제"; }, 3500); }
     }
   });
+  document.addEventListener("toggle", e => {
+    const d = e.target; if (!d || !d.matches || !d.matches("details[data-gk], details[data-rk]")) return;
+    if (d.dataset.gk) state.openG[d.dataset.gk] = d.open; else state.openR[d.dataset.rk] = d.open;
+  }, true);
   document.addEventListener("change", e => {
     const c = e.target.closest('[data-act="done"]'); if (!c) return;
     const base = recs().find(x => x.id === c.dataset.rec); if (!base) return;
@@ -926,7 +979,7 @@ function taskStatus(t, done, today) {
   $("#btn-settings").addEventListener("click", () => { const s = $("#settings"); s.hidden = !s.hidden; });
   $("#f-cancel").addEventListener("click", () => { $("#form").hidden = true; state.editing = null; });
   $("#f-save").addEventListener("click", saveForm);
-  ["f-name", "f-dept", "f-type", "f-apply", "f-start", "f-end", "f-birth", "f-ins", "f-sp", "f-inc", "f-memo"].forEach(id => {
+  ["f-name", "f-dept", "f-type", "f-apply", "f-start", "f-end", "f-birth", "f-ins", "f-sp", "f-inc", "f-post", "f-memo"].forEach(id => {
     $("#" + id).addEventListener("input", updatePreview); $("#" + id).addEventListener("change", updatePreview);
   });
   $("#f-start").addEventListener("change", () => { if (!$("#f-end").value && $("#f-start").value) { /* 종료일은 직접 입력 */ } });
