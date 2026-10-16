@@ -263,6 +263,16 @@ details.rec.sub .who { font-size: 14px; }
       <div class="fld"><label for="s-special">육아휴직 첫 3개월 특례 단가 (원, 2026년 시작분)</label><input type="number" id="s-special" min="0" step="10000"><span class="hint">2026년부터 월 100만원. 2025.12.31 이전 시작분은 월 200만원으로 계산합니다.</span></div>
       <div class="fld"><label for="s-inc">인센티브 단가 (원)</label><input type="number" id="s-inc" min="0" step="10000"><span class="hint">사업장에서 1~3번째로 허용한 사례에 월 10만원이 추가됩니다.</span></div>
     </div>
+    <div class="grid">
+      <div class="fld">
+        <label for="s-post">잔여 50% 신청 마감 기준</label>
+        <select id="s-post">
+          <option value="after6">종료 후 6개월 경과 다음날부터 12개월 (고용24 지원절차 안내, 기본)</option>
+          <option value="end">휴직 종료일 + 12개월 (더 이른 날짜, 안전하게 관리)</option>
+        </select>
+        <span class="hint">같은 고용24 안내에 두 표현이 함께 있습니다. 확실하지 않으면 더 이른 날짜를 고르세요.</span>
+      </div>
+    </div>
     <div class="rules">
       <h3>계산 기준 (2026.10 웹 자료 조사)</h3>
       <ul>
@@ -277,6 +287,7 @@ details.rec.sub .who { font-size: 14px; }
         <li>지원금 단가: 육아휴직 월 30만원, 육아기 근로시간 단축 월 30만원(인센티브 적용 시 월 40만원). 육아휴직은 만 12개월 이내 자녀에 3개월 이상 연속 허용하면 첫 3개월 월 100만원(2026년부터, 이전은 200만원). 인센티브는 사업장 1~3번째 허용 사례에 월 10만원 추가이며 특례와 중복됩니다. 지원 기간은 최대 1년이고 육아기 단축은 사용하지 않은 휴직 기간을 더해 최대 2년입니다. (고용24 출산육아기 고용안정장려금 안내, 노무법인 해든)</li>
         <li>지원금 예상액: 사용 기간을 개월 수로 환산(만 N개월 + 남은 일수/30)해 단가를 곱한 값입니다. 3개월 구간마다 50%를, 잔여 50%는 복직 후 6개월 계속 고용 뒤 신청합니다. 시작 달 일할 계산과 인센티브 적용 여부는 실제 심사와 다를 수 있어 예상액으로만 보세요. 고용24의 다른 안내 페이지에는 2026년 특례도 월 200만원으로 남아 있는 곳이 있어, 접수 전 고용센터(1350)에서 확인하세요.</li>
         <li>1차 구간 시작: 고용24 안내 문구는 시작일이 속한 달을 제외한다고 쓰고, 같은 안내의 예시(1월 15일 시작은 4월 1일부터 신청)는 시작 달을 포함합니다. 기본값은 더 늦은 쪽입니다. 접수 전에 관할 고용센터(1350)에서 확인하세요.</li>
+        <li>잔여 50% 마감: 고용24 안내는 "종료일로부터 12개월 이내"(자격 요건)와 "종료 후 6개월이 경과한 다음날부터 12개월 이내"(지원절차, 고용보험법 시행규칙 제51조 제3항)를 함께 적고 있어 기준이 갈립니다. 기본은 후자이며, 기준 설정에서 더 이른 전자로 바꿀 수 있습니다.</li>
         <li>시작 달 중간에 시작한 경우 그 달의 일할 처리는 이 도구가 계산하지 않습니다.</li>
         <li>배우자 출산휴가 사용 기한이 2026.9.18부터 바뀐다는 블로그 글이 있으나 법령으로 확인하지 못했습니다. 이 도구는 출산일 + 120일로 계산합니다.</li>
         <li>대체인력 지원금과 업무분담 지원금은 포함하지 않았습니다.</li>
@@ -433,7 +444,10 @@ function buildTasksAll(r, cfg) {
     });
     const pf = D.addMonths(D.addDays(r.end, 1), 6);
     T.push({ key: "subPost", kind: "task", group: "지원금", title: name + " 잔여 50% 신청", sub: "복직 후 6개월 계속 고용", where: where,
-      from: pf, due: D.addDays(D.addMonths(pf, 12), -1), note: "복직 후 6개월 이상 계속 고용한 경우 일시금으로 신청합니다. 중간에 퇴사하면 받을 수 없습니다." });
+      from: pf, due: cfg.postRule === "end" ? lim12(r.end) : D.addDays(D.addMonths(pf, 12), -1),
+      note: "복직 후 6개월 이상 계속 고용한 경우 일시금으로 신청합니다. 중간에 퇴사하면 받을 수 없습니다. " +
+        (cfg.postRule === "end" ? "기한은 휴직 종료일 + 12개월 기준입니다."
+          : "같은 안내에 '종료일로부터 12개월 이내'라는 문구도 있어 그 기준이면 " + lim12(r.end).replace(/-/g, ".") + "까지입니다. 가능하면 6개월이 지나는 즉시 신청하세요.") });
   }
   return T;
 }
@@ -504,7 +518,7 @@ function taskStatus(t, done, today) {
   const dot = s => s.replace(/-/g, ".");
   const dotW = s => dot(s) + "(" + WD[new Date(D.ms(s)).getUTCDay()] + ")";
   const todayStr = () => { const n = new Date(); return n.getFullYear() + "-" + p2(n.getMonth() + 1) + "-" + p2(n.getDate()); };
-  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl", base: 300000, special: 1000000, special25: 2000000, inc: 100000 }, tab: "cal", filter: "all", showDone: false, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false, openG: {}, openR: {} };
+  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl", postRule: "after6", base: 300000, special: 1000000, special25: 2000000, inc: 100000 }, tab: "cal", filter: "all", showDone: false, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false, openG: {}, openR: {} };
   let dbNS = null, queue = Promise.resolve(), toastTimer = null;
   const LS = "leave-tracker-v1";
 
@@ -759,7 +773,7 @@ function taskStatus(t, done, today) {
     $("#view").innerHTML = state.tab === "todo" ? renderTodo(items) : state.tab === "cal" ? renderCal() : state.tab === "money" ? renderMoney() : renderEmp();
     const an = alertItems().length; const ab = $("#alert-n"); ab.textContent = an; ab.hidden = an === 0;
     $("#s-priority").value = state.cfg.priority ? "1" : "0";
-    $("#s-rule").value = state.cfg.startRule;
+    $("#s-rule").value = state.cfg.startRule; $("#s-post").value = state.cfg.postRule;
     [["s-base", "base"], ["s-special", "special"], ["s-inc", "inc"]].forEach(x => { const el = $("#" + x[0]); if (document.activeElement !== el) el.value = state.cfg[x[1]]; });
   }
 
@@ -985,6 +999,7 @@ function taskStatus(t, done, today) {
   $("#f-start").addEventListener("change", () => { if (!$("#f-end").value && $("#f-start").value) { /* 종료일은 직접 입력 */ } });
   $("#s-priority").addEventListener("change", e => { state.cfg.priority = e.target.value === "1"; persistCfg(); render(); });
   [["s-base", "base"], ["s-special", "special"], ["s-inc", "inc"]].forEach(x => $("#" + x[0]).addEventListener("change", e => { const v = Math.max(0, Math.round(+e.target.value || 0)); state.cfg[x[1]] = v; persistCfg(); render(); }));
+  $("#s-post").addEventListener("change", e => { state.cfg.postRule = e.target.value; persistCfg(); render(); });
   $("#s-rule").addEventListener("change", e => { state.cfg.startRule = e.target.value; persistCfg(); render(); });
 
   /* ---------- backup / restore ---------- */
