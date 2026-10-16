@@ -141,7 +141,7 @@ details.rec > summary::-webkit-details-marker { display: none; }
 @media (max-width: 560px) { .grid { grid-template-columns: minmax(0, 1fr); } }
 .fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .fld label { font-size: 12.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.02em; }
-.fld input[type="text"], .fld select, .fld textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 8px 10px; min-width: 0; width: 100%; }
+.fld input[type="text"], .fld input[type="number"], .fld select, .fld textarea { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 8px 10px; min-width: 0; width: 100%; }
 .fld.wide { grid-column: 1 / -1; }
 .fld .hint { font-size: 12px; color: var(--muted); }
 .preview { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -153,6 +153,22 @@ details.rec > summary::-webkit-details-marker { display: none; }
 .rules h3 { margin: 6px 0 0; font-size: 13px; color: var(--ink); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 6px; font-size: 13px; z-index: 10; max-width: calc(100% - 32px); }
 .badge { display: inline-block; min-width: 1.4em; padding: 0 6px; border-radius: 999px; background: var(--over); color: var(--surface); font-size: 12px; text-align: center; margin-left: 4px; }
+
+.amt { font-family: var(--font-mono); font-size: 12.5px; color: var(--ok); font-variant-numeric: tabular-nums; }
+.money { display: flex; flex-direction: column; gap: 18px; }
+.mgrp { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.mgrp-h { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.mgrp-h b { font-size: 16px; }
+.mgrp-h .tot { font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; }
+.mrec { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.mrec h4 { margin: 0; font-size: 13.5px; font-weight: 600; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tbl td.n, .tbl th.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl tr.isdone td { color: var(--muted); }
+.tbl tfoot td { font-weight: 600; border-bottom: 0; }
+.twrap { overflow-x: auto; }
 .calhead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .calhead .mo { font-size: 18px; font-weight: 700; }
 .calnav { display: flex; gap: 6px; align-items: center; }
@@ -230,6 +246,11 @@ details.rec > summary::-webkit-details-marker { display: none; }
         <span class="hint">두 방식은 첫 신청 가능일이 한 달 차이 납니다. 아래 설명을 확인하세요.</span>
       </div>
     </div>
+    <div class="grid">
+      <div class="fld"><label for="s-base">월 지원 단가 (원)</label><input type="number" id="s-base" min="0" step="10000"><span class="hint">육아휴직·육아기 단축 공통 월 30만원이 기본입니다.</span></div>
+      <div class="fld"><label for="s-special">육아휴직 첫 3개월 특례 단가 (원, 2026년 시작분)</label><input type="number" id="s-special" min="0" step="10000"><span class="hint">2026년부터 월 100만원. 2025.12.31 이전 시작분은 월 200만원으로 계산합니다.</span></div>
+      <div class="fld"><label for="s-inc">인센티브 단가 (원)</label><input type="number" id="s-inc" min="0" step="10000"><span class="hint">사업장에서 1~3번째로 허용한 사례에 월 10만원이 추가됩니다.</span></div>
+    </div>
     <div class="rules">
       <h3>계산 기준 (2026.10 웹 자료 조사)</h3>
       <ul>
@@ -241,6 +262,8 @@ details.rec > summary::-webkit-details-marker { display: none; }
       </ul>
       <h3>확인이 필요한 부분</h3>
       <ul>
+        <li>지원금 단가: 육아휴직 월 30만원, 육아기 근로시간 단축 월 30만원(인센티브 적용 시 월 40만원). 육아휴직은 만 12개월 이내 자녀에 3개월 이상 연속 허용하면 첫 3개월 월 100만원(2026년부터, 이전은 200만원). 인센티브는 사업장 1~3번째 허용 사례에 월 10만원 추가이며 특례와 중복됩니다. 지원 기간은 최대 1년이고 육아기 단축은 사용하지 않은 휴직 기간을 더해 최대 2년입니다. (고용24 출산육아기 고용안정장려금 안내, 노무법인 해든)</li>
+        <li>지원금 예상액: 사용 기간을 개월 수로 환산(만 N개월 + 남은 일수/30)해 단가를 곱한 값입니다. 3개월 구간마다 50%를, 잔여 50%는 복직 후 6개월 계속 고용 뒤 신청합니다. 시작 달 일할 계산과 인센티브 적용 여부는 실제 심사와 다를 수 있어 예상액으로만 보세요. 고용24의 다른 안내 페이지에는 2026년 특례도 월 200만원으로 남아 있는 곳이 있어, 접수 전 고용센터(1350)에서 확인하세요.</li>
         <li>1차 구간 시작: 고용24 안내 문구는 시작일이 속한 달을 제외한다고 쓰고, 같은 안내의 예시(1월 15일 시작은 4월 1일부터 신청)는 시작 달을 포함합니다. 기본값은 더 늦은 쪽입니다. 접수 전에 관할 고용센터(1350)에서 확인하세요.</li>
         <li>시작 달 중간에 시작한 경우 그 달의 일할 처리는 이 도구가 계산하지 않습니다.</li>
         <li>배우자 출산휴가 사용 기한이 2026.9.18부터 바뀐다는 블로그 글이 있으나 법령으로 확인하지 못했습니다. 이 도구는 출산일 + 120일로 계산합니다.</li>
@@ -268,6 +291,12 @@ details.rec > summary::-webkit-details-marker { display: none; }
       <div class="fld" id="w-ins"><label for="f-ins">고용보험료 지원 사업장</label>
         <select id="f-ins"><option value="0">아니오</option><option value="1">예 (휴직 등 신고서 필요)</option></select>
       </div>
+      <div class="fld" id="w-sp"><label for="f-sp">첫 3개월 특례 (육아휴직)</label>
+        <select id="f-sp"><option value="0">해당 없음</option><option value="1">해당 (자녀 만 12개월 이내 + 3개월 이상 연속 휴직)</option></select>
+      </div>
+      <div class="fld" id="w-inc"><label for="f-inc">인센티브 월 +10만원</label>
+        <select id="f-inc"><option value="0">해당 없음</option><option value="1">해당 (사업장에서 1~3번째로 허용한 사례)</option></select>
+      </div>
       <div class="fld wide"><label for="f-memo">메모 (선택)</label><input type="text" id="f-memo" autocomplete="off"></div>
     </div>
     <div id="f-warn"></div>
@@ -290,6 +319,7 @@ details.rec > summary::-webkit-details-marker { display: none; }
       <button role="tab" id="tab-todo" aria-selected="false" type="button">해야 할 일</button>
       
       <button role="tab" id="tab-emp" aria-selected="false" type="button">직원별</button>
+      <button role="tab" id="tab-money" aria-selected="false" type="button">지원금</button>
     </div>
     <div class="filters" id="filters"></div>
   </div>
@@ -393,6 +423,40 @@ function buildTasks(r, cfg) {
   return T;
 }
 
+function subsidy(r, cfg) {
+  if (!validRec(r) || r.type === "spouse" || !cfg.priority) return null;
+  const dur = D.diff(r.end, r.start) + 1; if (dur < 30) return null;
+  const endEx = D.addDays(r.end, 1);
+  let whole = 0; while (D.addMonths(r.start, whole + 1) <= endEx) whole++;
+  let M = whole + D.diff(endEx, D.addMonths(r.start, whole)) / 30;
+  const capped = r.type === "parental" && M > 12; if (capped) M = 12;
+  const inc = r.incentive ? cfg.inc : 0;
+  const spRate = r.start < "2026-01-01" ? cfg.special25 : cfg.special;
+  const useSp = r.type === "parental" && !!r.special && M >= 3;
+  const normal = cfg.base + inc, special = spRate + inc;
+  let left = M, total = 0; const out = [];
+  blocks(r.start, r.end, cfg.startRule).forEach((b, i) => {
+    const m = Math.max(0, Math.min(3, left)); left -= m;
+    const ms = useSp && i === 0 ? Math.min(3, m) : 0;
+    const full = ms * special + (m - ms) * normal;
+    total += full;
+    out.push({ n: b.n, key: "sub" + b.n, label: b.label, from: b.from, months: m, spMonths: ms, full: Math.round(full), pay: Math.round(full / 2) });
+  });
+  if (left > 0.001) {
+    const ms = 0, full = left * normal;
+    if (out.length) { const l = out[out.length - 1]; l.months += left; l.full = Math.round(l.full + full); l.pay = Math.round(l.full / 2); }
+    else out.push({ n: 1, key: "sub1", label: "해당 구간", from: D.addDays(D.fmt(Date.UTC(+r.start.slice(0, 4), +r.start.slice(5, 7), 0)), 1), months: left, spMonths: ms, full: Math.round(full), pay: Math.round(full / 2) });
+    total += full;
+  }
+  return { months: M, capped: capped, normal: normal, special: special, useSp: useSp, blocks: out, total: Math.round(total), post: Math.round(total / 2) };
+}
+
+function subAmt(r, cfg, key) {
+  const S = subsidy(r, cfg); if (!S) return null;
+  if (key === "subPost") return S.post;
+  const b = S.blocks.find(x => x.key === key); return b ? b.pay : null;
+}
+
 function warnings(r) {
   const W = [];
   if (!validRec(r)) return W;
@@ -420,7 +484,7 @@ function taskStatus(t, done, today) {
   const dot = s => s.replace(/-/g, ".");
   const dotW = s => dot(s) + "(" + WD[new Date(D.ms(s)).getUTCDay()] + ")";
   const todayStr = () => { const n = new Date(); return n.getFullYear() + "-" + p2(n.getMonth() + 1) + "-" + p2(n.getDate()); };
-  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl" }, tab: "cal", filter: "all", showDone: false, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false };
+  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl", base: 300000, special: 1000000, special25: 2000000, inc: 100000 }, tab: "cal", filter: "all", showDone: false, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false };
   let dbNS = null, queue = Promise.resolve(), toastTimer = null;
   const LS = "leave-tracker-v1";
 
@@ -476,6 +540,12 @@ function taskStatus(t, done, today) {
   }
 
   /* ---------- views ---------- */
+  const won = n => Math.round(n).toLocaleString("ko-KR") + "원";
+  function amtHtml(t, rec, done) {
+    if (t.kind === "info") return "";
+    const a = subAmt(rec, state.cfg, t.key); if (a == null) return "";
+    return '<div class="amt">' + (done ? "신청 완료 · " : "예상 ") + won(a) + (t.key === "subPost" ? " (전체의 50%)" : " (구간의 50%)") + "</div>";
+  }
   function rowHtml(t, rec, opts) {
     const done = rec.done && rec.done[t.key];
     const info = t.kind === "info";
@@ -492,7 +562,7 @@ function taskStatus(t, done, today) {
       '<div class="main"><div class="ttl">' + esc(t.title) + (t.sub ? ' <span class="meta">' + esc(t.sub) + "</span>" : "") +
       (t.soft ? '<span class="tag">권장</span>' : "") + '<span class="tag g-' + esc(t.group) + '">' + esc(t.group) + "</span></div>" +
       '<div class="meta">' + esc(opts.noWho ? t.where : who + " · " + t.where) + "</div>" +
-      (t.note ? '<div class="note">' + esc(t.note) + "</div>" : "") + "</div>" +
+      (t.note ? '<div class="note">' + esc(t.note) + "</div>" : "") + amtHtml(t, rec, done) + "</div>" +
       '<div class="side mono">' + dates + chk + "</div></li>";
   }
 
@@ -585,6 +655,40 @@ function taskStatus(t, done, today) {
     }).join("");
   }
 
+  function renderMoney() {
+    const list = recs().filter(validRec);
+    if (!list.length) return '<div class="empty">등록된 결재가 없습니다.</div>';
+    if (!state.cfg.priority) return '<div class="empty">대규모 기업으로 설정되어 있어 사업주 지원금이 없습니다. 기준 설정에서 사업장 구분을 확인하세요.</div>';
+    const groups = {};
+    list.forEach(r => { const k = r.name + "|" + (r.dept || ""); (groups[k] = groups[k] || []).push(r); });
+    let gT = 0, gD = 0;
+    const gl = Object.keys(groups).map(k => groups[k].slice().sort((a, b) => (a.start < b.start ? -1 : 1)));
+    gl.sort((a, b) => (a[0].name < b[0].name ? -1 : 1));
+    const body = gl.map(g => {
+      let tot = 0, dn = 0;
+      const recsHtml = g.map(r => {
+        const S = subsidy(r, state.cfg);
+        const head = nm(r) + " · " + TYPE[r.type] + " · " + dot(r.start) + " ~ " + dot(r.end);
+        if (r.type === "spouse") return '<div class="mrec"><h4>' + esc(head) + '</h4><div class="meta">배우자 출산휴가는 사업주 지원금이 없습니다.</div></div>';
+        if (!S) return '<div class="mrec"><h4>' + esc(head) + '</h4><div class="meta">30일 미만이라 지원금 대상이 아닙니다.</div></div>';
+        const rows = S.blocks.filter(b => b.months > 0).map(b => {
+          const d = r.done && r.done[b.key]; tot += b.pay; if (d) dn += b.pay;
+          return [b.n + "차", b.label + "분 (" + (Math.round(b.months * 10) / 10) + "개월분" + (b.spMonths ? ", 특례 " + (Math.round(b.spMonths * 10) / 10) + "개월" : "") + ")", dot(b.from).slice(2) + " ~", b.pay, b.key, d];
+        });
+        const pd = r.done && r.done.subPost; tot += S.post; if (pd) dn += S.post;
+        rows.push(["잔여 50%", "복직 후 6개월 계속 고용 시", dot(D.addMonths(D.addDays(r.end, 1), 6)).slice(2) + " ~", S.post, "subPost", pd]);
+        const rate = "월 " + won(S.normal) + (S.useSp ? " (첫 3개월 " + won(S.special) + ")" : "") + " × " + (Math.round(S.months * 10) / 10) + "개월" + (S.capped ? " (육아휴직 지원 최대 1년 적용)" : "");
+        return '<div class="mrec"><h4>' + esc(head) + '</h4><div class="meta">' + esc(rate + " = 총 " + won(S.total)) + '</div><div class="twrap"><table class="tbl"><thead><tr><th>차수</th><th>신청 구간</th><th>신청 가능일</th><th class="n">예상 금액</th><th>상태</th></tr></thead><tbody>' +
+          rows.map(x => '<tr class="' + (x[5] ? "isdone" : "") + '"><td>' + esc(x[0]) + "</td><td>" + esc(x[1]) + '</td><td class="n">' + esc(x[2]) + '</td><td class="n">' + won(x[3]) + '</td><td><label class="chk"><input type="checkbox" data-act="done" data-rec="' + esc(r.id) + '" data-key="' + esc(x[4]) + '"' + (x[5] ? " checked" : "") + "> " + (x[5] ? "신청 완료 " + esc(dot(x[5]).slice(2)) : "신청 전") + "</label></td></tr>").join("") +
+          "</tbody></table></div></div>";
+      }).join("");
+      gT += tot; gD += dn;
+      return '<section class="mgrp"><div class="mgrp-h"><b>' + esc(g[0].name) + (g[0].dept ? ' <span class="meta">' + esc(g[0].dept) + "</span>" : "") + '</b><span class="tot">합계 ' + won(tot) + " · 신청 완료 " + won(dn) + " · 남음 " + won(tot - dn) + "</span></div>" + recsHtml + "</section>";
+    }).join("");
+    return '<div class="money"><div class="summary"><div><b>' + won(gT) + '</b><span>예상 지원금 합계</span></div><div><b>' + won(gD) + '</b><span>신청 완료</span></div><div class="c-soon"><b>' + won(gT - gD) + '</b><span>아직 신청 전</span></div><div><b>' + gl.length + '명</b><span>대상자</span></div></div>' +
+      '<div class="meta">예상액입니다. 고용센터 심사와 일할 계산에 따라 실제 지급액은 달라질 수 있습니다. 단가는 기준 설정에서 바꿀 수 있습니다.</div>' + body + "</div>";
+  }
+
   function renderFilters() {
     if (state.tab !== "todo") { $("#filters").innerHTML = ""; return; }
     const f = [["all", "전체"], ["report", "신고·확인서"], ["grant", "지원금"]];
@@ -603,11 +707,13 @@ function taskStatus(t, done, today) {
     $("#tab-todo").setAttribute("aria-selected", state.tab === "todo");
     $("#tab-emp").setAttribute("aria-selected", state.tab === "emp");
     $("#tab-cal").setAttribute("aria-selected", state.tab === "cal");
+    $("#tab-money").setAttribute("aria-selected", state.tab === "money");
     renderFilters();
-    $("#view").innerHTML = state.tab === "todo" ? renderTodo(items) : state.tab === "cal" ? renderCal() : renderEmp();
+    $("#view").innerHTML = state.tab === "todo" ? renderTodo(items) : state.tab === "cal" ? renderCal() : state.tab === "money" ? renderMoney() : renderEmp();
     const an = alertItems().length; const ab = $("#alert-n"); ab.textContent = an; ab.hidden = an === 0;
     $("#s-priority").value = state.cfg.priority ? "1" : "0";
     $("#s-rule").value = state.cfg.startRule;
+    [["s-base", "base"], ["s-special", "special"], ["s-inc", "inc"]].forEach(x => { const el = $("#" + x[0]); if (document.activeElement !== el) el.value = state.cfg[x[1]]; });
   }
 
   /* ---------- calendar ---------- */
@@ -752,12 +858,12 @@ function taskStatus(t, done, today) {
     return { id: state.editing ? state.editing.id : "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       name: $("#f-name").value.trim(), dept: $("#f-dept").value.trim(), type: $("#f-type").value,
       apply: getDate("f-apply"), start: getDate("f-start"), end: getDate("f-end"),
-      birth: getDate("f-birth"), insSupport: $("#f-ins").value === "1", memo: $("#f-memo").value.trim(),
+      birth: getDate("f-birth"), insSupport: $("#f-ins").value === "1", special: $("#f-sp").value === "1", incentive: $("#f-inc").value === "1", memo: $("#f-memo").value.trim(),
       done: state.editing ? Object.assign({}, state.editing.done) : {} };
   }
   function syncTypeFields() {
     const t = $("#f-type").value;
-    $("#w-birth").hidden = t !== "spouse"; $("#w-ins").hidden = t !== "reduced";
+    $("#w-birth").hidden = t !== "spouse"; $("#w-ins").hidden = t !== "reduced"; $("#w-sp").hidden = t !== "parental"; $("#w-inc").hidden = t === "spouse";
   }
   function updatePreview() {
     syncTypeFields();
@@ -773,7 +879,7 @@ function taskStatus(t, done, today) {
     const v = rec || { name: "", dept: "", type: "parental", apply: todayStr(), start: "", end: "", birth: "", insSupport: false, memo: "" };
     $("#f-name").value = v.name; $("#f-dept").value = v.dept || ""; $("#f-type").value = v.type;
     setDate("f-apply", v.apply); setDate("f-start", v.start); setDate("f-end", v.end);
-    setDate("f-birth", v.birth); $("#f-ins").value = v.insSupport ? "1" : "0"; $("#f-memo").value = v.memo || "";
+    setDate("f-birth", v.birth); $("#f-ins").value = v.insSupport ? "1" : "0"; $("#f-sp").value = v.special ? "1" : "0"; $("#f-inc").value = v.incentive ? "1" : "0"; $("#f-memo").value = v.memo || "";
     $("#form").hidden = false; updatePreview();
     $("#form").scrollIntoView({ block: "start" }); $("#f-name").focus({ preventScroll: true });
   }
@@ -814,16 +920,18 @@ function taskStatus(t, done, today) {
   });
   $("#tab-todo").addEventListener("click", () => { state.tab = "todo"; render(); });
   $("#tab-emp").addEventListener("click", () => { state.tab = "emp"; render(); });
+  $("#tab-money").addEventListener("click", () => { state.tab = "money"; render(); });
   $("#tab-cal").addEventListener("click", () => { state.tab = "cal"; render(); });
   $("#btn-new").addEventListener("click", () => openForm(null));
   $("#btn-settings").addEventListener("click", () => { const s = $("#settings"); s.hidden = !s.hidden; });
   $("#f-cancel").addEventListener("click", () => { $("#form").hidden = true; state.editing = null; });
   $("#f-save").addEventListener("click", saveForm);
-  ["f-name", "f-dept", "f-type", "f-apply", "f-start", "f-end", "f-birth", "f-ins", "f-memo"].forEach(id => {
+  ["f-name", "f-dept", "f-type", "f-apply", "f-start", "f-end", "f-birth", "f-ins", "f-sp", "f-inc", "f-memo"].forEach(id => {
     $("#" + id).addEventListener("input", updatePreview); $("#" + id).addEventListener("change", updatePreview);
   });
   $("#f-start").addEventListener("change", () => { if (!$("#f-end").value && $("#f-start").value) { /* 종료일은 직접 입력 */ } });
   $("#s-priority").addEventListener("change", e => { state.cfg.priority = e.target.value === "1"; persistCfg(); render(); });
+  [["s-base", "base"], ["s-special", "special"], ["s-inc", "inc"]].forEach(x => $("#" + x[0]).addEventListener("change", e => { const v = Math.max(0, Math.round(+e.target.value || 0)); state.cfg[x[1]] = v; persistCfg(); render(); }));
   $("#s-rule").addEventListener("change", e => { state.cfg.startRule = e.target.value; persistCfg(); render(); });
 
   /* ---------- backup / restore ---------- */
