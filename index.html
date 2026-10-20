@@ -716,7 +716,7 @@ function subsidy(r, cfg) {
 
 function subAmt(r, cfg, key) {
   const S = subsidy(r, cfg); if (!S) return null;
-  if (key === "subPost") return S.post;
+  if (key === "subPost") return r.postFull ? S.total : S.post;
   const b = S.blocks.find(x => x.key === key); return b ? b.pay : null;
 }
 
@@ -1074,7 +1074,8 @@ function taskStatus(t, done, today) {
         if (!S) return '<div class="mrec">' + head + '<div class="meta">30일 미만이라 지원금 대상이 아닙니다.</div></div>';
         const rows = S.blocks.filter(b => b.months > 0 && !r.postOnly).map(b =>
           ({ name: b.n + "차", range: b.label + " (" + (Math.round(b.months * 10) / 10) + "개월" + (b.spMonths ? ", 특례 " + (Math.round(b.spMonths * 10) / 10) + "개월" : "") + ")", from: b.from, exp: b.pay, key: b.key, sub: true }));
-        rows.push({ name: "잔여 50%", range: "복직 후 6개월 계속 고용 시", from: D.addMonths(D.addDays(S.end, 1), 6), exp: S.post, key: "subPost", sub: false });
+        const full = !!r.postFull && !!r.postOnly;
+        rows.push({ name: full ? "전액 (100%)" : "잔여 50%", range: full ? "복직 후 한 번에 신청 (50%씩 나누지 않음)" : "복직 후 6개월 계속 고용 시", from: D.addMonths(D.addDays(S.end, 1), 6), exp: full ? S.total : S.post, key: "subPost", sub: false, full: full });
         const keys = rows.map(x => x.key);
         const B = r.bundle || {};
         const tgt = k => (B[k] && keys.indexOf(B[k]) > keys.indexOf(k) ? B[k] : null);
@@ -1094,12 +1095,13 @@ function taskStatus(t, done, today) {
           if (pv != null) got += pv; else left += x.exp;
           const diff = pv != null ? pv - combined : 0;
           if (diff) diffAny = true;
-          const canBundle = x.sub && rows.slice(0, i).some(y => y.sub && !tgt(y.key) && paidAt(r, y.key) == null);
+          const canBundle = rows.slice(0, i).some(y => y.sub && !tgt(y.key) && paidAt(r, y.key) == null);
+          const fullBtn = !x.sub && r.postOnly ? '<button type="button" class="linkbtn sm blk" data-act="postfull" data-rec="' + esc(r.id) + '">' + (x.full ? "50%로 되돌리기" : '<span class="lg">전액(100%) 한 번에 받음</span><span class="sh">전액</span>') + "</button>" : "";
           return '<tr class="' + (pv != null ? "ispaid" : d ? "isdone" : "") + '"><td>' + esc(x.name) + (mates.length ? '<div class="sm-note">' + esc(mates.map(y => y.name).join("·")) + " 포함</div>" : "") + "</td><td>" + esc(x.range) + '</td><td class="d">' + esc(dotW(x.from)) + '</td><td class="n">' + won(x.exp) + (mates.length ? '<div class="sm-note">합산 ' + won(combined) + "</div>" : "") + "</td>" +
             '<td class="pd"><label class="paidf"><input type="text" inputmode="numeric" autocomplete="off" class="paid" data-act="paid" data-rec="' + esc(r.id) + '" data-key="' + esc(key) + '" value="' + (pv != null ? pv.toLocaleString("ko-KR") : "") + '" placeholder="입금액" aria-label="' + esc(x.name) + ' 실제 입금액"><span>원</span></label>' +
             (diff ? '<div class="pdiff ' + (diff > 0 ? "up" : "down") + '">예상보다 ' + (diff > 0 ? "+" : "−") + won(Math.abs(diff)) + "</div>" : "") + "</td>" +
             '<td><label class="chk"><input type="checkbox" data-act="done" data-rec="' + esc(r.id) + '" data-key="' + esc(key) + '"' + (d ? " checked" : "") + '> <span class="cl">' + (pv != null ? "입금 완료" : d ? "신청 완료" : "신청 전") + "</span></label>" +
-            (canBundle ? '<button type="button" class="linkbtn sm blk" data-act="bundle" data-rec="' + esc(r.id) + '" data-key="' + esc(key) + '" title="앞 차수를 이 차수와 한 번에 신청한 것으로 표시">↑ <span class="lg">앞 차수와 함께 신청</span><span class="sh">합치기</span></button>' : "") + "</td></tr>";
+            (canBundle ? '<button type="button" class="linkbtn sm blk" data-act="bundle" data-rec="' + esc(r.id) + '" data-key="' + esc(key) + '" title="앞 차수를 이 차수와 한 번에 신청한 것으로 표시">↑ <span class="lg">앞 차수와 함께 신청</span><span class="sh">합치기</span></button>' : "") + fullBtn + "</td></tr>";
         }).join("");
         const rate = "월 " + won(S.normal) + (S.useSp ? " (첫 3개월 " + won(S.special) + ")" : "") + " × " + (Math.round(S.months * 10) / 10) + "개월" + (S.capped ? " (육아휴직 지원 최대 1년 적용)" : "");
         const hint = diffAny && !r.demo ? '<div class="warn">실제 입금액이 예상과 다릅니다. ' + (r.type === "parental" && !r.special ? "첫 3개월 특례(만 12개월 이내 자녀, 월 100만원) 대상이라면 결재를 수정해 \"첫 3개월 특례\"를 해당으로 바꾸세요. " : "") + (!r.incentive ? "사업장 1~3번째 허용 사례라면 \"인센티브 월 +10만원\"을 해당으로 바꾸세요. " : "") + "여러 차수를 한 번에 받은 금액이면 '앞 차수와 함께 신청'으로 묶으세요.</div>" : "";
@@ -1311,7 +1313,7 @@ function taskStatus(t, done, today) {
       name: $("#f-name").value.trim(), dept: $("#f-dept").value.trim(), type: $("#f-type").value,
       apply: getDate("f-apply"), start: getDate("f-start"), end: getDate("f-end"),
       birth: getDate("f-birth"), insSupport: $("#f-ins").value === "1", special: $("#f-sp").value === "1", incentive: $("#f-inc").value === "1", postOnly: $("#f-post").value === "1" && $("#f-type").value !== "spouse", memo: $("#f-memo").value.trim(),
-      done: state.editing ? Object.assign({}, state.editing.done) : {}, paid: state.editing ? Object.assign({}, state.editing.paid) : {}, bundle: state.editing ? Object.assign({}, state.editing.bundle) : {}, mergePrev: !!(state.editing && state.editing.mergePrev) };
+      done: state.editing ? Object.assign({}, state.editing.done) : {}, paid: state.editing ? Object.assign({}, state.editing.paid) : {}, bundle: state.editing ? Object.assign({}, state.editing.bundle) : {}, mergePrev: !!(state.editing && state.editing.mergePrev), postFull: !!(state.editing && state.editing.postFull) };
   }
   function syncTypeFields() {
     const t = $("#f-type").value;
@@ -1354,19 +1356,24 @@ function taskStatus(t, done, today) {
       if (state.quick) state.tab = state.quick === "active" ? "emp" : "todo";
       render();
     }
+    else if (act === "postfull") {
+      const base = recs().find(x => x.id === b.dataset.rec); if (!base) return;
+      saveRec(base, Object.assign({}, base, { postFull: !base.postFull }));
+      toast(base.postFull ? "잔여 50%로 되돌렸습니다." : "전액(100%)을 한 번에 받은 것으로 계산합니다.");
+    }
     else if (act === "bundle" || act === "unbundle") {
       const base = recs().find(x => x.id === b.dataset.rec); if (!base) return;
       const k = b.dataset.key, nr = Object.assign({}, base, { bundle: Object.assign({}, base.bundle), done: Object.assign({}, base.done) });
       if (act === "unbundle") { delete nr.bundle[k]; saveRec(base, nr); toast("따로 신청한 것으로 되돌렸습니다."); return; }
       const S = subsidy(base, state.cfg); if (!S) return;
-      const order = S.blocks.filter(x => x.months > 0).map(x => x.key);
+      const order = (base.postOnly ? [] : S.blocks.filter(x => x.months > 0).map(x => x.key)).concat(["subPost"]);
       const t = (base.bundle || {});
       order.slice(0, order.indexOf(k)).forEach(q => {
         if (t[q] || paidAt(base, q) != null) return;
         nr.bundle[q] = k; if (!nr.done[q]) nr.done[q] = nr.done[k] || todayStr();
       });
       if (!nr.done[k]) nr.done[k] = todayStr();
-      saveRec(base, nr); toast("앞 차수를 " + k.slice(3) + "차와 한 번에 신청한 것으로 표시했습니다.");
+      saveRec(base, nr); toast("앞 차수를 " + (k === "subPost" ? "잔여 50%" : k.slice(3) + "차") + "와 한 번에 신청한 것으로 표시했습니다.");
     }
     else if (act === "note") {
       const nk = b.dataset.nk, v = !state.openN[nk]; state.openN[nk] = v;
