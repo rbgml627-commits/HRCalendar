@@ -264,9 +264,19 @@ details.rec.sub .pbar { width: 80px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 6px; font-size: 13px; z-index: 30; max-width: calc(100% - 32px); }
 
 /* ---------- 지원금 ---------- */
-.money { display: flex; flex-direction: column; gap: 14px; }
+.money { display: flex; flex-direction: column; gap: 10px; }
 .money .summary b { font-size: 22px; }
-.mgrp { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.mgrp { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.mgrp > summary { list-style: none; cursor: pointer; padding: 14px 16px 14px 36px; position: relative; display: flex; flex-direction: column; gap: 4px; }
+.mgrp > summary::-webkit-details-marker { display: none; }
+.mgrp > summary::before { content: "▸"; position: absolute; left: 16px; top: 16px; font-size: 12px; color: var(--muted); transition: transform 0.15s; }
+.mgrp[open] > summary::before { transform: rotate(90deg); }
+.mgrp > summary:hover { background: var(--surface-2); border-radius: 8px; }
+.mgrp[open] > summary { border-bottom: 1px solid var(--line); }
+.mnext { font-size: 13px; color: var(--muted); }
+.mnext b { color: var(--ink); font-weight: 600; }
+.mbody { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.mbody > .mrec:first-child { border-top: 0; }
 .mgrp-h { display: flex; justify-content: space-between; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .mgrp-h > b { font-size: 16px; }
 .mgrp-h > b .meta { font-weight: 500; }
@@ -558,7 +568,7 @@ function buildChains(list) {
     let cur = null;
     rs.forEach((r, i) => {
       if (i > 0) PREVR[r.id] = rs[i - 1];
-      if (i > 0 && r.mergePrev && cur && !r.postOnly && !rs[i - 1].postOnly) { cur.members.push(r.id); if (r.end > cur.end) cur.end = r.end; }
+      if (i > 0 && r.mergePrev && cur) { cur.members.push(r.id); if (r.end > cur.end) cur.end = r.end; }
       else { cur = { head: r.id, members: [r.id], start: r.start, end: r.end, prev: i > 0 ? rs[i - 1].id : null }; }
       CHAIN[r.id] = cur;
     });
@@ -712,7 +722,7 @@ function subAmt(r, cfg, key) {
 
 function buildTasks(r, cfg) {
   const T = buildTasksAll(r, cfg);
-  return r.postOnly ? T.filter(t => t.key === "subPost" || t.key === "nosub") : T;
+  return r.postOnly ? T.filter(t => t.key === "subPost" || t.key === "nosub" || t.key === "chain") : T;
 }
 
 function warnings(r) {
@@ -743,7 +753,7 @@ function taskStatus(t, done, today) {
   const dot = s => s.replace(/-/g, ".");
   const dotW = s => dot(s) + "(" + WD[new Date(D.ms(s)).getUTCDay()] + ")";
   const todayStr = () => { const n = new Date(); return n.getFullYear() + "-" + p2(n.getMonth() + 1) + "-" + p2(n.getDate()); };
-  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl", blockRule: "start", postRule: "after6", base: 300000, special: 1000000, special25: 2000000, inc: 100000 }, tab: (function () { try { const t = localStorage.getItem("leave-tracker-tab"); return ["todo", "cal", "emp", "money"].indexOf(t) >= 0 ? t : "todo"; } catch (e) { return "todo"; } })(), filter: "all", showDone: false, quick: null, openN: {}, fold: {}, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false, openG: {}, openR: {} };
+  const state = { records: [], demo: [], cfg: { priority: true, startRule: "excl", blockRule: "start", postRule: "after6", base: 300000, special: 1000000, special25: 2000000, inc: 100000 }, tab: (function () { try { const t = localStorage.getItem("leave-tracker-tab"); return ["todo", "cal", "emp", "money"].indexOf(t) >= 0 ? t : "todo"; } catch (e) { return "todo"; } })(), filter: "all", showDone: false, quick: null, openN: {}, fold: {}, openM: {}, mode: "local", editing: null, calY: new Date().getFullYear(), calM: new Date().getMonth(), sel: null, ready: false, openG: {}, openR: {} };
   let dbNS = null, queue = Promise.resolve(), toastTimer = null;
   const LS = "leave-tracker-v1";
 
@@ -976,7 +986,7 @@ function taskStatus(t, done, today) {
     return h + "</div></div>";
   }
   function mergeHtml(r) {
-    const pr = PREVR[r.id]; if (!pr || r.type === "spouse" || r.postOnly || pr.postOnly) return "";
+    const pr = PREVR[r.id]; if (!pr || r.type === "spouse") return "";
     const cont = D.addDays(pr.end, 1) === r.start;
     return '<label class="mergebox"><input type="checkbox" data-act="merge" data-rec="' + esc(r.id) + '"' + (r.mergePrev ? " checked" : "") + (r.demo ? " disabled" : "") + '> <span><b>고용24에는 앞 결재' + (NTH[pr.id] ? "(" + NTH[pr.id] + "회)" : "") + "와 한 건으로 신고됨</b> · 켜면 지원금 차수·신청 기한·급여 기간을 합친 기간으로 계산합니다." +
       (cont && !r.mergePrev ? " <em>기간이 앞 결재에 바로 이어집니다.</em>" : "") + "</span></label>";
@@ -1049,6 +1059,7 @@ function taskStatus(t, done, today) {
     const gl = Object.keys(groups).map(k => groups[k].slice().sort((a, b) => byDate(a.start, b.start)));
     gl.sort((a, b) => (a[0].name < b[0].name ? -1 : 1));
     const rowName = k => (k === "subPost" ? "잔여 50%" : k.slice(3) + "차");
+    const rowLabel = o => (NTH[o.r.id] ? "[" + NTH[o.r.id] + "회] " : "") + (o.t.key === "subPost" ? "잔여 50%" : o.t.key.slice(3) + "차") + " 신청";
     const body = gl.map(g => {
       let tot = 0, got = 0, left = 0;
       const recsHtml = g.map(r => {
@@ -1097,8 +1108,10 @@ function taskStatus(t, done, today) {
       }).join("");
       gT += tot; gP += got; gL += left;
       const p = tot ? Math.round((tot - left) / tot * 100) : 0;
-      return '<section class="mgrp"><div class="mgrp-h"><b>' + esc(g[0].name) + (g[0].dept ? ' <span class="meta">' + esc(g[0].dept) + "</span>" : "") + "</b>" +
-        (tot ? '<div class="mtot"><span>예상 <b>' + won(tot) + '</b></span><span class="got">입금 <b>' + won(got) + '</b></span><span class="left">남음 <b>' + won(left) + '</b></span><div class="pbar" aria-hidden="true"><i style="width:' + p + '%"></i></div></div>' : '<div class="mtot">지원금 없음</div>') + '</div>' + recsHtml + "</section>";
+      const mk = g[0].name + "|" + (g[0].dept || "");
+      const nextOpen = (() => { const o = []; g.forEach(r => openTasks(r).forEach(x => { if (x.t.group === "지원금") o.push(x); })); o.sort((a, b) => byDate(a.d, b.d)); return o[0]; })();
+      return '<details class="mgrp" data-mk="' + esc(mk) + '"' + (state.openM[mk] ? " open" : "") + '><summary><div class="mgrp-h"><b>' + esc(g[0].name) + (g[0].dept ? ' <span class="meta">' + esc(g[0].dept) + "</span>" : "") + "</b>" +
+        (tot ? '<div class="mtot"><span>예상 <b>' + won(tot) + '</b></span><span class="got">입금 <b>' + won(got) + '</b></span><span class="left">남음 <b>' + won(left) + '</b></span><div class="pbar" aria-hidden="true"><i style="width:' + p + '%"></i></div></div>' : '<div class="mtot">지원금 없음</div>') + '</div>' + (nextOpen ? '<div class="mnext">다음: <b>' + esc(rowLabel(nextOpen)) + "</b> · " + (nextOpen.s.k === "wait" ? dotW(nextOpen.t.from) + " 신청 시작 (" + nextOpen.s.big + ")" : dotW(nextOpen.t.due) + " 마감 (" + nextOpen.s.big + ")") + "</div>" : "") + '</summary><div class="mbody">' + recsHtml + "</div></details>";
     }).join("");
     const z = n => (n ? "" : " zero");
     return '<div class="money"><div class="summary"><div class="' + z(gT) + '"><b>' + won(gT) + '</b><span>예상 지원금 합계</span></div><div class="c-got' + z(gP) + '"><b>' + won(gP) + '</b><span>실제 입금 합계</span></div><div class="c-soon' + z(gL) + '"><b>' + won(gL) + '</b><span>아직 안 들어온 예상액</span></div><div><b>' + gl.length + '명</b><span>대상자</span></div></div>' +
@@ -1376,7 +1389,8 @@ function taskStatus(t, done, today) {
     }
   });
   document.addEventListener("toggle", e => {
-    const d = e.target; if (!d || !d.matches || !d.matches("details[data-gk], details[data-rk], details[data-fold]")) return;
+    const d = e.target; if (!d || !d.matches || !d.matches("details[data-gk], details[data-rk], details[data-fold], details[data-mk]")) return;
+    if (d.dataset.mk) { state.openM[d.dataset.mk] = d.open; return; }
     if (d.dataset.fold) {
       state.fold[d.dataset.fold] = d.open;
       const sm = d.querySelector("summary"); if (sm) sm.innerHTML = sm.innerHTML.replace(d.open ? "펼쳐 보기" : "접기", d.open ? "접기" : "펼쳐 보기");
